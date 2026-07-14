@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Download arrow icon on violet gradient -->
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M54,28 L54,68 M54,68 L40,54 M54,68 L68,54"
+        android:strokeWidth="5"
+        android:strokeColor="#A78BFA"
+        android:fillType="nonZero"/>
+    <!-- Horizontal line (tray) -->
+    <path
+        android:pathData="M36,72 L72,72"
+        android:strokeWidth="5"
+        android:strokeColor="#A78BFA"/>
+</vector>
