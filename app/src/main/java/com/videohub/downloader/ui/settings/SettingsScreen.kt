@@ -189,7 +189,6 @@ fun SettingsScreen() {
                     Button(
                         onClick = {
                             prefs.edit().apply {
-                                stringSet("default_format", setOf(defaultFormat)) // using string is safer
                                 putString("default_format", defaultFormat)
                                 putString("default_quality", defaultQuality)
                                 putInt("max_concurrency", maxConcurrency)

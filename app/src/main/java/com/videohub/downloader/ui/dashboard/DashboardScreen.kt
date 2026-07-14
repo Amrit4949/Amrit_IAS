@@ -8,12 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,7 +40,7 @@ fun GlassCard(
             .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(20.dp)),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0x2B0F172A) // 17% opacity slate-900 for glass simulation
+            containerColor = Color(0x2B0F172A)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         content = content
@@ -66,20 +63,16 @@ fun DashboardScreen() {
     var format by remember { mutableStateOf("mp4") }
     var quality by remember { mutableStateOf("best") }
 
-    // Playlist selection states
-    var showPlaylistSheet by remember { mutableStateOf(false) }
-    val selectedIndexes = remember { mutableStateListOf<Int>() }
-
     // Active Jobs Flow collected as Compose state
     val activeDownloads by db.getDownloadsByStatusFlow("DOWNLOADING").collectAsState(initial = emptyList())
     val mergingDownloads by db.getDownloadsByStatusFlow("MERGING").collectAsState(initial = emptyList())
     val activeJobs = remember(activeDownloads, mergingDownloads) { activeDownloads + mergingDownloads }
 
-    // Background Gradient matching web style
+    // Background Gradient
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFF0A051B), // Dark violet
-            Color(0xFF03001E)  // Dark space black
+            Color(0xFF0A051B),
+            Color(0xFF03001E)
         )
     )
 
@@ -98,7 +91,7 @@ fun DashboardScreen() {
                 text = "VideoHub",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFA78BFA), // Pastel Violet
+                color = Color(0xFFA78BFA),
                 modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
             )
             Text(
@@ -128,7 +121,7 @@ fun DashboardScreen() {
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
@@ -143,13 +136,6 @@ fun DashboardScreen() {
                                         YtDlpService.getMetadata(url)
                                     }
                                     metadata = info
-                                    if (info.isPlaylist == true && info.entries != null) {
-                                        selectedIndexes.clear()
-                                        for (i in 0 until info.entries.size) {
-                                            selectedIndexes.add(i)
-                                        }
-                                        showPlaylistSheet = true
-                                    }
                                 } catch (e: Exception) {
                                     error = e.message ?: "Failed to resolve link metadata"
                                 } finally {
@@ -159,7 +145,7 @@ fun DashboardScreen() {
                         },
                         enabled = !isAnalyzing && url.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6366F1), // Indigo
+                            containerColor = Color(0xFF6366F1),
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(12.dp),
@@ -215,8 +201,9 @@ fun DashboardScreen() {
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
+                        val durationMins = (info.duration ?: 0L) / 60
                         Text(
-                            text = "Length: ${info.duration / 60} mins",
+                            text = "Length: $durationMins mins",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0x99FFFFFF),
                             modifier = Modifier.padding(bottom = 16.dp)
@@ -224,7 +211,7 @@ fun DashboardScreen() {
 
                         Divider(color = Color(0x1AFFFFFF), modifier = Modifier.padding(bottom = 16.dp))
 
-                        // Format & Quality Selection selectors
+                        // Format & Quality Selection
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -278,7 +265,7 @@ fun DashboardScreen() {
                                             unfocusedBorderColor = Color(0x33FFFFFF)
                                         ),
                                         modifier = Modifier.menuAnchor()
-                                    )
+                                    ) 
                                     if (format != "mp3") {
                                         ExposedDropdownMenu(
                                             expanded = qualityExpanded,
@@ -298,35 +285,25 @@ fun DashboardScreen() {
 
                         Button(
                             onClick = {
-                                if (info.isPlaylist == true) {
-                                    showPlaylistSheet = true
-                                } else {
-                                    val intent = Intent(context, DownloadService::class.java).apply {
-                                        putExtra("downloadId", UUID.randomUUID().toString())
-                                        putExtra("url", url)
-                                        putExtra("format", format)
-                                        putExtra("quality", quality)
-                                    }
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        context.startForegroundService(intent)
-                                    } else {
-                                        context.startService(intent)
-                                    }
-                                    url = ""
-                                    metadata = null
+                                val intent = Intent(context, DownloadService::class.java).apply {
+                                    putExtra("downloadId", UUID.randomUUID().toString())
+                                    putExtra("url", url)
+                                    putExtra("format", format)
+                                    putExtra("quality", quality)
                                 }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    context.startForegroundService(intent)
+                                } else {
+                                    context.startService(intent)
+                                }
+                                url = ""
+                                metadata = null
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)), // Violet
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (info.isPlaylist == true) {
-                                Icon(Icons.Default.List, contentDescription = "Playlist")
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Review Playlist (${selectedIndexes.size} items)")
-                            } else {
-                                Text("Start Downloading")
-                            }
+                            Text("Start Downloading")
                         }
                     }
                 }
@@ -361,17 +338,17 @@ fun DashboardScreen() {
                                 maxLines = 1
                             )
                             Spacer(modifier = Modifier.height(8.dp))
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(text = "${job.speed ?: "Processing"}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981)) // Emerald speed
-                                Text(text = "ETA: ${job.eta ?: "--:--"}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9)) // Cyan eta
+                                Text(text = "${job.speed ?: "Processing"}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981))
+                                Text(text = "ETA: ${job.eta ?: "--:--"}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF67E8F9))
                             }
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            
+
                             LinearProgressIndicator(
                                 progress = job.progress / 100f,
                                 color = Color(0xFFA78BFA),
@@ -379,119 +356,6 @@ fun DashboardScreen() {
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                    }
-                }
-            }
-        }
-
-        // Playlist bottom sheet review
-        if (showPlaylistSheet && metadata != null && metadata!!.isPlaylist == true) {
-            ModalBottomSheet(
-                onDismissRequest = { showPlaylistSheet = false },
-                containerColor = Color(0xFF0F172A),
-                tonalElevation = 8.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Review Playlist Items",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    Text(
-                        text = "Select which files to queue from ${metadata!!.title}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0x99FFFFFF),
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    ) {
-                        TextButton(onClick = {
-                            selectedIndexes.clear()
-                            for (i in 0 until metadata!!.entries.size) {
-                                selectedIndexes.add(i)
-                            }
-                        }) {
-                            Text("Select All", color = Color(0xFFA78BFA))
-                        }
-                        TextButton(onClick = {
-                            selectedIndexes.clear()
-                        }) {
-                            Text("Select None", color = Color(0x99FFFFFF))
-                        }
-                    }
-
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        itemsIndexed(metadata!!.entries) { index, item ->
-                            val isChecked = selectedIndexes.contains(index)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { checked ->
-                                        if (checked) {
-                                            selectedIndexes.add(index)
-                                        } else {
-                                            selectedIndexes.remove(index)
-                                        }
-                                    },
-                                    colors = CheckboxDefaults.colors(checkedColor = Color(0xFF6366F1))
-                                )
-                                Text(
-                                    text = item.title ?: "Video #${index + 1}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = {
-                            selectedIndexes.forEach { index ->
-                                val item = metadata!!.entries[index]
-                                val intent = Intent(context, DownloadService::class.java).apply {
-                                    putExtra("downloadId", UUID.randomUUID().toString())
-                                    putExtra("url", item.webpageUrl ?: url)
-                                    putExtra("format", format)
-                                    putExtra("quality", quality)
-                                }
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    context.startForegroundService(intent)
-                                } else {
-                                    context.startService(intent)
-                                }
-                            }
-                            showPlaylistSheet = false
-                            url = ""
-                            metadata = null
-                        },
-                        enabled = selectedIndexes.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
-                    ) {
-                        Text("Queue ${selectedIndexes.size} Downloads")
                     }
                 }
             }
