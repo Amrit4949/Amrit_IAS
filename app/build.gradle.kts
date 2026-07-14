@@ -79,11 +79,10 @@ dependencies {
     // WorkManager (Auto-resume handling)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
-    // Embedded Media download Engines
-    // yt-dlp binary wrapper
-    implementation("com.github.yausername.youtubedl-android:library:0.16.0")
-    // FFmpeg kit native JNI
-    implementation("com.arthenica:ffmpeg-kit-full:5.1")
+    // Embedded Media download Engines (youtubedl-android includes yt-dlp + FFmpeg)
+    val ytdlpVersion = "0.17.2"
+    implementation("io.github.junkfood02.youtubedl-android:library:$ytdlpVersion")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$ytdlpVersion")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
