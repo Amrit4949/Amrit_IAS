@@ -201,7 +201,8 @@ fun DashboardScreen() {
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        val durationMins = (info.duration ?: 0L) / 60
+                        val durationSecs = try { info.duration?.toLong() ?: 0L } catch (_: Exception) { 0L }
+                        val durationMins = durationSecs / 60L
                         Text(
                             text = "Length: $durationMins mins",
                             style = MaterialTheme.typography.bodySmall,
