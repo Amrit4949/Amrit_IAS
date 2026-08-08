@@ -30,9 +30,17 @@ it. The server is already written. It just needs a home.
 1. Go to **https://console.firebase.google.com** and sign in with your Google account.
 2. Click **Create a project**.
 3. Name it anything — `beacon` is fine. Click **Continue**.
+
+   > You want the **Spark** plan, which is the free one. It is the default, and it is all this
+   > needs. Sending pushes does not require a paid plan.
 4. It asks about Google Analytics. Turn it **off**. Click **Create project**.
 5. Wait for it, then click **Continue**.
-6. On the main screen, click the **Android** icon (a little robot).
+6. On the project page, click the **+ Add app** button — it sits just under the big project
+   name near the top left. A panel opens asking which platform. Choose **Android** (the robot).
+
+   > Older guides say to click an Android icon on the main screen. Firebase moved it behind
+   > **+ Add app**. Same thing.
+
 7. In **Android package name**, type exactly this and nothing else:
 
    ```
