@@ -12,6 +12,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout source
@@ -50,3 +52,24 @@ jobs:
         with:
           name: beacon-debug-apk
           path: beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk
+
+      # Artifacts can only be downloaded from a logged-in desktop browser, which is the wrong
+      # place when you want the app on a phone. A release gives a plain public link that any
+      # phone browser can open.
+      - name: Publish to the "beacon-latest" release
+        if: github.ref_name == 'claude/android-bypass-silent-mode-990lcw'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk beacon.apk
+          gh release delete beacon-latest --yes --cleanup-tag || true
+          gh release create beacon-latest beacon.apk \
+            --title "Beacon (latest build)" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --notes "Newest test build of the Beacon app.
+
+          Download **beacon.apk** below and install it on your phone.
+
+          This is the \`lan\` build: it rings phones on the same Wi-Fi with no setup at all.
+          To ring phones anywhere, see beacon/README.md."
