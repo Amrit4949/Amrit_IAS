@@ -1,0 +1,13 @@
+name = "beacon-relay"
+main = "src/worker.js"
+compatibility_date = "2024-05-02"
+
+# Holds one small JSON record per circle: device id -> {push token, sealed name, last seen}.
+# Registrations carry a 60 day TTL that every sync refreshes, so a circle whose phones are
+# all gone expires on its own.
+[[kv_namespaces]]
+binding = "CIRCLES"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# The Firebase service account JSON is a secret, never a var:
+#   wrangler secret put FCM_SERVICE_ACCOUNT

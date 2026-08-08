@@ -11,7 +11,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -46,9 +49,9 @@ import com.amrit.beacon.R
 import com.amrit.beacon.alert.AlertProfile
 import com.amrit.beacon.data.BeaconSettings
 import com.amrit.beacon.data.SettingsStore
+import com.amrit.beacon.net.DirectoryEntry
 import com.amrit.beacon.net.LanTransport
 import com.amrit.beacon.net.PairCode
-import com.amrit.beacon.net.Peer
 
 /**
  * The main screen: who else is in the circle, and how hard to ring them.
@@ -60,7 +63,7 @@ import com.amrit.beacon.net.Peer
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(vm: BeaconViewModel, settings: BeaconSettings) {
-    val peers by vm.peers.collectAsState()
+    val directory by vm.directory.collectAsState()
     val status by vm.transportStatus.collectAsState()
     val readiness by vm.readiness.collectAsState()
     val alertState by vm.alertState.collectAsState()
@@ -78,6 +81,7 @@ fun HomeScreen(vm: BeaconViewModel, settings: BeaconSettings) {
     var profile by remember(settings.defaultProfile) { mutableStateOf(settings.defaultProfile) }
     var codeVisible by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var relayDraft by remember(settings.relayUrl) { mutableStateOf(settings.relayUrl) }
 
     if (renaming) {
         RenameDialog(
@@ -166,18 +170,33 @@ fun HomeScreen(vm: BeaconViewModel, settings: BeaconSettings) {
                 )
             }
 
-            if (peers.isEmpty()) {
-                item { EmptyPeers(status) }
+            if (directory.isEmpty()) {
+                item { EmptyPeers(status, settings.hasRelay) }
             } else {
-                items(peers, key = { it.deviceId }) { peer ->
+                items(directory, key = { it.deviceId }) { entry ->
                     PeerRow(
-                        peer = peer,
-                        busy = peer.deviceId in sending,
-                        onRing = { vm.ring(peer, profile) },
-                        onStop = { vm.stopPeer(peer) },
+                        entry = entry,
+                        busy = entry.deviceId in sending,
+                        onRing = { vm.ring(entry, profile) },
+                        onStop = { vm.stopPeer(entry) },
                     )
                 }
             }
+
+            if (settings.hasRelay) {
+                item {
+                    // For the case the peer list cannot help with: you have no idea which
+                    // phone is where, so wake all of them and follow the noise.
+                    OutlinedButton(
+                        onClick = { vm.ringEverything(profile) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.home_ring_all))
+                    }
+                }
+            }
+
+            item { RelayCard(vm, settings.hasRelay, relayDraft, { relayDraft = it }) }
 
             item {
                 OutlinedButton(
@@ -268,8 +287,96 @@ private fun RenameDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
     )
 }
 
+/**
+ * Where a distant phone is set up.
+ *
+ * Kept on the main screen rather than hidden behind a settings icon because without it the
+ * app silently only works on one Wi-Fi, and a user whose phone is genuinely lost is the
+ * worst possible person to be discovering that.
+ */
 @Composable
-private fun PeerRow(peer: Peer, busy: Boolean, onRing: () -> Unit, onStop: () -> Unit) {
+private fun RelayCard(
+    vm: BeaconViewModel,
+    configured: Boolean,
+    draft: String,
+    onDraftChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val reachable by vm.reachableRemotely.collectAsState()
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (configured) Icons.Filled.CloudQueue else Icons.Filled.CloudOff,
+                    contentDescription = null,
+                    tint = if (configured && reachable) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Column(modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)) {
+                    Text(
+                        text = stringResource(R.string.relay_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(
+                            when {
+                                !configured -> R.string.relay_state_none
+                                !vm.canReceiveRemotely -> R.string.relay_state_send_only
+                                reachable -> R.string.relay_state_ready
+                                else -> R.string.relay_state_pending
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = { expanded = !expanded }) {
+                    Text(
+                        stringResource(
+                            if (expanded) R.string.action_hide else R.string.action_change
+                        )
+                    )
+                }
+            }
+
+            if (expanded) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    label = { Text(stringResource(R.string.relay_label)) },
+                    placeholder = { Text("https://beacon-relay.example.workers.dev") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(R.string.relay_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = { vm.setRelayUrl(draft) }) {
+                    Text(stringResource(R.string.action_save))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeerRow(
+    entry: DirectoryEntry,
+    busy: Boolean,
+    onRing: () -> Unit,
+    onStop: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -282,20 +389,38 @@ private fun PeerRow(peer: Peer, busy: Boolean, onRing: () -> Unit, onStop: () ->
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.Smartphone,
+                imageVector = when {
+                    entry.isNearby -> Icons.Filled.Wifi
+                    entry.reachableRemotely -> Icons.Filled.CloudQueue
+                    else -> Icons.Filled.Smartphone
+                },
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = if (entry.isUnreachable) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(peer.deviceName, style = MaterialTheme.typography.titleMedium)
+                Text(entry.deviceName, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = peer.hostLabel,
+                    // Says which route will be used, because the two do not behave the same:
+                    // one confirms the phone answered, the other confirms it was sent.
+                    text = when {
+                        entry.isNearby -> stringResource(
+                            R.string.peer_nearby,
+                            entry.lan?.hostLabel.orEmpty(),
+                        )
+
+                        entry.reachableRemotely -> stringResource(R.string.peer_remote)
+                        else -> stringResource(R.string.peer_unreachable)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             TextButton(onClick = onStop) { Text(stringResource(R.string.action_stop)) }
-            Button(onClick = onRing, enabled = !busy) {
+            Button(onClick = onRing, enabled = !busy && !entry.isUnreachable) {
                 if (busy) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
@@ -315,7 +440,7 @@ private fun PeerRow(peer: Peer, busy: Boolean, onRing: () -> Unit, onStop: () ->
 }
 
 @Composable
-private fun EmptyPeers(status: LanTransport.Status) {
+private fun EmptyPeers(status: LanTransport.Status, hasRelay: Boolean) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -332,7 +457,9 @@ private fun EmptyPeers(status: LanTransport.Status) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = stringResource(R.string.home_empty_hint),
+                text = stringResource(
+                    if (hasRelay) R.string.home_empty_hint_relay else R.string.home_empty_hint
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

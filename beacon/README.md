@@ -4,7 +4,7 @@ Make one of your phones ring at full volume from another phone — through silen
 vibrate, and through Do Not Disturb.
 
 Both phones install the APK, both type the same short code, and from then on either one can
-ring the other. No account, no server, no Firebase project, no per-message cost.
+ring the other — on the same Wi-Fi, or on opposite sides of the country.
 
 ---
 
@@ -58,31 +58,60 @@ only channel that works for a phone you can neither hear nor feel.
 
 ## How the ring gets there
 
+Two transports, one protocol. The signed line is identical on both paths, so the receiving
+phone has exactly one verification routine rather than two.
+
+**Nearby — straight over the Wi-Fi.** mDNS discovery (`_beacon._tcp`) plus a TCP socket. No
+server in the path, no internet needed, and the peer signs a reply, so "Ringing X" on screen
+is a claim about that handset.
+
 ```
 Phone A                                            Phone B
-  │                                                   │
   │  mDNS  _beacon._tcp   ◄──── discovery ────►       │
-  │                                                   │
   │  BEACON/1 RING <id> <name> <nonce> <ts> max <hmac>│
-  ├──────────────── TCP ─────────────────────────────►│
-  │                                                   ├─ verify HMAC
-  │                                                   ├─ check replay guard
-  │◄─────────── signed HELLO reply ───────────────────┤
-  │                                                   └─ AlertEngine.start()
-  └─ "Ringing Phone B"
+  ├──────────────── TCP ─────────────────────────────►├─ verify HMAC
+  │◄─────────── signed HELLO reply ───────────────────┤─ check replay guard
+  └─ "Ringing Phone B"                                └─ AlertEngine.start()
 ```
 
-**Why the LAN and not push.** It works the moment both APKs are installed — nothing to
-provision, nothing to pay for, nothing to keep running. The cost is that both phones must be
-on the same Wi-Fi. See [Going beyond one network](#going-beyond-one-network) below.
+**Far away — through a relay you own.** The same signed line goes to a tiny Cloudflare Worker,
+which pushes it to the circle's other phones as a high-priority FCM data message.
 
-**Why a foreground service.** Since Android 12, a backgrounded app is generally forbidden
-from *starting* a foreground service. That is the wall the obvious design hits: a socket wakes
-you, and you then cannot legally start the service that would play the alarm. Beacon keeps one
-long-lived foreground service that already owns both the listener and the alert engine, so
-nothing ever has to be started from the background — it is already running and simply
-escalates. The alert screen is then raised by a **full-screen intent**, which is the only
-sanctioned way to put a UI in front of someone on a locked, sleeping phone.
+```
+Phone A ──HTTPS──► your relay ──FCM (data, high priority)──► Phone B
+   │                (holds the                                  ├─ verify HMAC
+   │                 push tokens)                               ├─ check replay guard
+   └─ "Sent to Phone B"                                         └─ AlertEngine.start()
+```
+
+Note the different wording. Over the LAN the peer signs a reply, so success means *that phone
+authenticated the request*. Through the relay there is no end-to-end acknowledgement — success
+means the relay accepted it for delivery. The UI says "Sent to" rather than "Ringing" for
+exactly that reason.
+
+The peer list merges both sources on device id, so one phone is one row however many routes
+reach it, and the Ring button prefers the local network when it is available.
+
+### Why there has to be a server at all
+
+Sending an FCM push requires a Google service account credential, and that can never ship
+inside an APK — anyone who unpacked the app could push to every device you own. So something
+you control has to hold it. [`relay/`](../relay) is the smallest thing that can: ~250 lines,
+free to run, and deliberately given nothing worth stealing. See
+[relay/README.md](../relay/README.md) for the threat model and a deploy walkthrough.
+
+### Why a foreground service
+
+Since Android 12, a backgrounded app is generally forbidden from *starting* a foreground
+service. That is the wall the obvious design hits: a socket wakes you, and you then cannot
+legally start the service that would play the alarm. Beacon keeps one long-lived foreground
+service that already owns both the listener and the alert engine, so nothing has to be started
+from the background — it is already running and simply escalates. On the push path the same
+problem is solved differently: a **high-priority** FCM data message grants a temporary
+exemption to start one, which is why the relay never sends normal-priority messages.
+
+The alert screen itself is raised by a **full-screen intent**, the only sanctioned way to put
+a UI in front of someone on a locked, sleeping phone.
 
 ---
 
@@ -139,12 +168,28 @@ checkbox that lies is worse than no checkbox.
 
 ## Building
 
+Two flavors, because reaching a distant phone needs configuration that reaching a nearby one
+does not.
+
+| Flavor | Needs | Can ring nearby | Can ring far away | Can *be* rung far away |
+| --- | --- | --- | --- | --- |
+| `lan` | nothing | yes | yes, with a relay saved | no |
+| `cloud` | `google-services.json` + a relay | yes | yes | yes |
+
 ```bash
-gradle :beacon:testDebugUnitTest    # unit tests
-gradle :beacon:assembleDebug        # APK at beacon/build/outputs/apk/debug/beacon-debug.apk
+gradle :beacon:testLanDebugUnitTest   # unit tests
+gradle :beacon:assembleLanDebug       # beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk
+gradle :beacon:assembleCloudDebug     # after dropping in beacon/google-services.json
 ```
 
-CI builds both on every push touching `beacon/` and uploads the APK as an artifact.
+The `lan` flavor links no Firebase at all, so there is nothing to misconfigure and nothing to
+crash at startup — that is the variant CI builds and proves. The Firebase Gradle plugin is
+applied only when `beacon/google-services.json` exists, so the repository builds for anyone who
+clones it.
+
+**To be reachable from anywhere, install the `cloud` build on every phone** and paste your
+relay URL into *Distant phones ▸ Change* on each. A `lan` build can still *send* a ring through
+a relay; it just cannot receive one.
 
 ### Trying it
 
@@ -165,6 +210,9 @@ Everything that can be tested without a handset, is:
 - `SirenSynthTest` — loudness floors, the anti-pop attack ramp, and that consecutive buffers
   join without a click. That last one catches a bug that is very easy to introduce and nearly
   impossible to spot by reading the code.
+- `CircleIdTest` — the privacy claim about the relay, made executable: that both phones derive
+  the same opaque circle id, that sealed names are randomised so repeats cannot be correlated,
+  and that a blob from another circle will not open.
 
 The parts that genuinely need a device — whether DND actually lifts, whether the OEM killed
 your service overnight — are not unit-testable, and pretending otherwise with mocks would test
@@ -172,29 +220,15 @@ the mocks.
 
 ---
 
-## Going beyond one network
-
-The [`Wire`](src/main/java/com/amrit/beacon/net/Wire.kt) protocol is transport-agnostic on
-purpose: it is a signed line of text, and `LanTransport` is one way to carry it. To ring a
-phone that is not on your Wi-Fi, carry the same line over FCM instead:
-
-1. Add Firebase to the module (this needs *your* `google-services.json`; it is not checked in).
-2. Store each phone's FCM token against its circle, keyed by a hash of the circle key so the
-   server never sees the key itself.
-3. Send the ring as a **high-priority data message** — normal priority gets deferred by Doze.
-4. In `FirebaseMessagingService.onMessageReceived`, hand the line to the same
-   `Wire.decode` → `ReplayGuard` → `AlertEngine.start` path the socket listener uses.
-
-The alert engine, the replay guard, the profiles and the signing all stay exactly as they are.
-Only the delivery changes.
-
----
-
 ## Limitations, honestly
 
-- **Same Wi-Fi only**, as shipped. See above.
+- **Distant phones need setup.** A Firebase project, a deployed relay, and the `cloud` build
+  on every phone. On the same Wi-Fi none of that is needed.
+- **No delivery receipt over the relay.** Success means the relay accepted the ring, not that
+  the phone rang. If the target is switched off or has no data, nothing will happen and nothing
+  can tell you so.
 - **Client isolation.** Many public and some hotel/office networks block device-to-device
-  traffic. Nothing in the app can work around that; the peer simply never appears.
+  traffic, which kills the LAN path. With a relay configured the push route still works.
 - **Alerts stop after 3 minutes.** A genuinely lost phone is better off with battery left to
   be found again.
 - **The torch is contended hardware.** If the camera is open, the strobe silently gives up.

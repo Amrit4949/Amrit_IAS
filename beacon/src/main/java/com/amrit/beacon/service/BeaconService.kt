@@ -19,8 +19,10 @@ import com.amrit.beacon.net.LanTransport
 import com.amrit.beacon.net.Wire
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -58,6 +60,7 @@ class BeaconService : Service() {
         observeSettings()
         observePeers()
         observeAlerts()
+        keepCloudRegistrationFresh()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,6 +71,20 @@ class BeaconService : Service() {
                     ?.let(AlertProfile::fromWireName) ?: AlertProfile.DEFAULT
                 alertEngine.start(profile, AlertEngine.Trigger.LOCAL_TEST)
             }
+
+            ACTION_REMOTE_RING -> {
+                // Already decoded, MAC-verified and replay-checked by whoever sent this
+                // intent. The service is not exported, so nothing outside the app can forge it.
+                val profile = intent.getStringExtra(EXTRA_PROFILE)
+                    ?.let(AlertProfile::fromWireName) ?: AlertProfile.DEFAULT
+                alertEngine.start(
+                    profile = profile,
+                    trigger = AlertEngine.Trigger.REMOTE,
+                    sourceName = intent.getStringExtra(EXTRA_SOURCE),
+                )
+            }
+
+            ACTION_CLOUD_SYNC -> syncCloud()
 
             ACTION_SHUTDOWN -> {
                 stopSelf()
@@ -137,6 +154,37 @@ class BeaconService : Service() {
         }
     }
 
+    /**
+     * Re-announces this phone to the relay on a slow timer.
+     *
+     * FCM tokens rotate — on reinstall, on app data clear, occasionally on their own — and a
+     * stale token on the relay is the worst kind of failure here: the phone looks reachable
+     * in the other handset's list and simply never rings. Re-registering costs one small
+     * HTTPS request an hour and removes that whole class of silent breakage.
+     */
+    private fun keepCloudRegistrationFresh() {
+        scope.launch {
+            while (true) {
+                syncCloud().join()
+                delay(CLOUD_SYNC_INTERVAL_MILLIS)
+            }
+        }
+    }
+
+    private fun syncCloud(): Job = scope.launch {
+        val settings = container.settingsStore.current()
+        if (!settings.isPaired || !settings.hasRelay || settings.deviceId.isEmpty()) {
+            container.cloudTransport.forget()
+            return@launch
+        }
+        val key = container.circleKey() ?: return@launch
+        container.cloudTransport.sync(
+            relayUrl = settings.relayUrl,
+            circleKey = key,
+            identity = Identity(settings.deviceId, settings.deviceName),
+        )
+    }
+
     @SuppressLint("MissingPermission") // guarded at runtime; a denied grant only means no notification
     private fun observePeers() {
         scope.launch {
@@ -186,9 +234,15 @@ class BeaconService : Service() {
         private const val TAG = "BeaconService"
 
         const val ACTION_STOP_ALERT = "com.amrit.beacon.STOP_ALERT"
+        const val ACTION_REMOTE_RING = "com.amrit.beacon.REMOTE_RING"
+        const val ACTION_CLOUD_SYNC = "com.amrit.beacon.CLOUD_SYNC"
         const val ACTION_TEST_ALERT = "com.amrit.beacon.TEST_ALERT"
         const val ACTION_SHUTDOWN = "com.amrit.beacon.SHUTDOWN"
         const val EXTRA_PROFILE = "profile"
+        const val EXTRA_SOURCE = "source"
+
+        /** Hourly. Frequent enough to catch a rotated token, rare enough to be free. */
+        private const val CLOUD_SYNC_INTERVAL_MILLIS = 60 * 60 * 1000L
 
         fun start(context: Context) {
             val intent = Intent(context, BeaconService::class.java)
@@ -210,6 +264,30 @@ class BeaconService : Service() {
                     Intent(context, BeaconService::class.java)
                         .setAction(ACTION_TEST_ALERT)
                         .putExtra(EXTRA_PROFILE, profile.wireName)
+                )
+            }
+        }
+
+        /**
+         * Raises an alert that arrived as a push. Started as a foreground service, which a
+         * high-priority FCM data message grants a temporary exemption to do even from the
+         * background — that exemption is the whole reason the push has to be high priority.
+         */
+        fun remoteRing(context: Context, profile: AlertProfile, sourceName: String?) {
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, BeaconService::class.java)
+                        .setAction(ACTION_REMOTE_RING)
+                        .putExtra(EXTRA_PROFILE, profile.wireName)
+                        .putExtra(EXTRA_SOURCE, sourceName)
+                )
+            }.onFailure { Log.w(TAG, "could not raise a pushed alert", it) }
+        }
+
+        fun syncCloud(context: Context) {
+            runCatching {
+                context.startForegroundService(
+                    Intent(context, BeaconService::class.java).setAction(ACTION_CLOUD_SYNC)
                 )
             }
         }

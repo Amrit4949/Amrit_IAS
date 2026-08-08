@@ -12,6 +12,7 @@
     <string name="action_rename">Rename</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_change">Change</string>
 
     <!-- Notification channels -->
     <string name="channel_listening_name">Findable</string>
@@ -63,6 +64,22 @@
     <string name="home_empty_starting">Starting up…</string>
     <string name="home_empty_failed">Could not start network discovery on this phone.</string>
     <string name="home_empty_hint">Both phones need Beacon open at least once, the same circle code, and the same Wi-Fi network.</string>
+    <string name="home_empty_hint_relay">Both phones need Beacon open at least once with the same circle code. On different networks, each phone must also be a cloud build with this relay saved.</string>
+    <string name="home_ring_all">Ring every phone in the circle</string>
+
+    <!-- Peer rows -->
+    <string name="peer_nearby">On this network (%1$s)</string>
+    <string name="peer_remote">Away, over the relay</string>
+    <string name="peer_unreachable">Not reachable right now</string>
+
+    <!-- Relay -->
+    <string name="relay_title">Distant phones</string>
+    <string name="relay_state_none">Local network only. Add a relay to ring phones anywhere.</string>
+    <string name="relay_state_ready">Ready. This phone can be rung from anywhere.</string>
+    <string name="relay_state_pending">Relay saved, but this phone has not registered yet.</string>
+    <string name="relay_state_send_only">This build can ring distant phones but cannot be rung. Install the cloud build to be reachable.</string>
+    <string name="relay_label">Relay address</string>
+    <string name="relay_help">Your own relay, deployed from the relay folder in this project. It never sees your circle code or your device names.</string>
 
     <string name="rename_title">Name this phone</string>
     <string name="rename_label">Shown on your other phones</string>

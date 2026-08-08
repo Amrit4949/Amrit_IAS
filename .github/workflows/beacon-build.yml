@@ -32,10 +32,11 @@ jobs:
       # Only the :beacon module. The unrelated :app module in this repo pulls large
       # native dependencies that have nothing to do with this build.
       - name: Run unit tests
-        run: gradle :beacon:testDebugUnitTest
+        run: gradle :beacon:testLanDebugUnitTest
 
+      # The lan flavor needs no google-services.json, so it is the one CI can prove.
       - name: Build debug APK
-        run: gradle :beacon:assembleDebug
+        run: gradle :beacon:assembleLanDebug
 
       - name: Upload test report on failure
         if: failure()
@@ -48,4 +49,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: beacon-debug-apk
-          path: beacon/build/outputs/apk/debug/beacon-debug.apk
+          path: beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk

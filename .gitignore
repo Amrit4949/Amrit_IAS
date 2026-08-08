@@ -13,3 +13,6 @@
 .cxx
 local.properties
 /app/build
+
+# Belongs to whoever ships the app; see beacon/README.md.
+beacon/google-services.json

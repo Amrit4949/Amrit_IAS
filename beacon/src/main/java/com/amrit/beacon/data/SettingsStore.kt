@@ -31,8 +31,15 @@ data class BeaconSettings(
     /** Whether this phone should stay reachable, i.e. run the listener service. */
     val listening: Boolean,
     val defaultProfile: AlertProfile,
+    /**
+     * HTTPS base URL of the relay that carries rings when the phones are not on the same
+     * network. Empty means local-network-only, which is a perfectly valid way to run the app.
+     */
+    val relayUrl: String,
 ) {
     val isPaired: Boolean get() = pairCode != null
+
+    val hasRelay: Boolean get() = relayUrl.isNotBlank()
 }
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "beacon")
@@ -45,6 +52,7 @@ class SettingsStore(private val context: Context) {
         val PAIR_CODE = stringPreferencesKey("pair_code")
         val LISTENING = booleanPreferencesKey("listening")
         val DEFAULT_PROFILE = stringPreferencesKey("default_profile")
+        val RELAY_URL = stringPreferencesKey("relay_url")
     }
 
     val settings: Flow<BeaconSettings> = context.dataStore.data.map { prefs ->
@@ -56,6 +64,7 @@ class SettingsStore(private val context: Context) {
             defaultProfile = AlertProfile.fromWireName(
                 prefs[Keys.DEFAULT_PROFILE] ?: AlertProfile.DEFAULT.wireName
             ),
+            relayUrl = prefs[Keys.RELAY_URL].orEmpty(),
         )
     }
 
@@ -92,6 +101,21 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setListening(enabled: Boolean) {
         context.dataStore.edit { it[Keys.LISTENING] = enabled }
+    }
+
+    /**
+     * Stores the relay URL, or clears it when blank. Rejects anything that is not HTTPS: the
+     * request carries a push token and a circle id, neither of which should ever be sent in
+     * the clear.
+     */
+    suspend fun setRelayUrl(url: String) {
+        val cleaned = url.trim().trimEnd('/')
+        require(cleaned.isEmpty() || cleaned.startsWith("https://")) {
+            "relay URL must start with https://"
+        }
+        context.dataStore.edit { prefs ->
+            if (cleaned.isEmpty()) prefs.remove(Keys.RELAY_URL) else prefs[Keys.RELAY_URL] = cleaned
+        }
     }
 
     suspend fun setDefaultProfile(profile: AlertProfile) {

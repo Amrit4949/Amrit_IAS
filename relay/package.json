@@ -1,0 +1,13 @@
+{
+  "name": "beacon-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Push relay for the Beacon Android app",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.60.0"
+  }
+}
