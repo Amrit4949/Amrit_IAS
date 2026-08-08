@@ -5,9 +5,11 @@
   "description": "Push relay for the Beacon Android app",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node test/relay.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^3.60.0"
-  }
+  },
+  "type": "module"
 }

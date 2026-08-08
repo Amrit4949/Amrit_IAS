@@ -1,0 +1,26 @@
+name: Test Beacon relay
+
+on:
+  push:
+    paths:
+      - 'relay/**'
+      - '.github/workflows/relay-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No install step: the tests use only Node built-ins, and wrangler is needed for
+      # deploying, not for exercising the worker.
+      - name: Run relay tests
+        working-directory: relay
+        run: npm test
