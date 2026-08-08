@@ -7,7 +7,7 @@ compatibility_date = "2024-05-02"
 # all gone expires on its own.
 [[kv_namespaces]]
 binding = "CIRCLES"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "edac0b10895048bbafe59b69f599ab47"
 
 # The Firebase service account JSON is a secret, never a var:
 #   wrangler secret put FCM_SERVICE_ACCOUNT

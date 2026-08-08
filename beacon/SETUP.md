@@ -122,24 +122,9 @@ page updates on its own within a few minutes.
    > This one is not a secret, unlike the private key from Part 3. It is just a name for your
    > storage box.
 
-Now paste it into the project, still in your browser:
-
-7. Open
-   **https://github.com/Amrit4949/Amrit_IAS/blob/claude/android-bypass-silent-mode-990lcw/relay/wrangler.toml**
-8. Click the **pencil icon** (top right) to edit.
-9. Find this line:
-
-   ```
-   id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
-   ```
-
-   Replace the placeholder text with your ID, keeping the quote marks. So it looks like:
-
-   ```
-   id = "8f3a2b1c9d4e5f6a7b8c9d0e1f2a3b4c"
-   ```
-
-10. Click **Commit changes** at the top right, then **Commit changes** again in the popup.
+> **Already done for you.** The id `edac0b10895048bbafe59b69f599ab47` is already committed
+> into `relay/wrangler.toml`. If you ever recreate the namespace, edit that file on GitHub
+> (pencil icon) and replace the id there.
 
 ---
 
