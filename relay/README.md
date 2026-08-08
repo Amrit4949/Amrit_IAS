@@ -27,16 +27,25 @@ tokens belong together. Run your own and that party is you.
 ## Deploying
 
 You need a Firebase project (free — FCM does not require the Blaze plan) and a Cloudflare
-account (free tier is plenty; no card).
+account (free tier, no card).
 
-**1. Firebase.** Create a project. Add an Android app with application id
-`com.amrit.beacon` — for the `cloud` flavor this is `com.amrit.beacon` with no suffix, since
-flavors only change the version name. Download `google-services.json` into `beacon/`.
+**The click-only walkthrough is [beacon/SETUP.md](../beacon/SETUP.md)** — start there. It
+covers the whole thing in a browser, including the Firebase side.
 
-**2. Service account.** Firebase console ▸ Project settings ▸ Service accounts ▸ *Generate new
-private key*. Keep the JSON safe; it is a credential for pushing to all your devices.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Amrit4949/Amrit_IAS/tree/claude/android-bypass-silent-mode-990lcw/relay)
 
-**3. Cloudflare.**
+Two things the button cannot do for you, both a minute each in the Cloudflare dashboard:
+
+1. **Create the KV namespace** and put its id into `wrangler.toml`. The button deploys what is
+   in the repository, and the binding has to resolve to a namespace that exists in *your*
+   account.
+2. **Set the `FCM_SERVICE_ACCOUNT` secret**, under the worker's *Settings → Variables and
+   Secrets*. Paste the whole service account JSON from the Firebase console. It is a
+   credential for pushing to all of your devices, so it is a secret and never a plain var.
+
+### From a terminal instead
+
+If you would rather not use the button:
 
 ```bash
 cd relay
@@ -47,15 +56,25 @@ npx wrangler secret put FCM_SERVICE_ACCOUNT  # paste the whole service account J
 npx wrangler deploy
 ```
 
-Deploy prints a URL like `https://beacon-relay.<subdomain>.workers.dev`. Check it:
+### Checking it
 
 ```bash
-curl -X POST https://beacon-relay.<subdomain>.workers.dev/health   # -> ok
+curl https://beacon-relay.<subdomain>.workers.dev/health   # -> ok
 ```
 
-**4. The phones.** Build and install the `cloud` flavor on each one
-(`gradle :beacon:assembleCloudDebug`), then paste that URL into **Distant phones ▸ Change** on
-every phone in the circle. Each will register itself within a few seconds.
+## Tests
+
+```bash
+cd relay
+npm test
+```
+
+Runs the real worker against fake storage and a fake Google. Everything except the outbound
+network calls is genuinely executed — routing, validation, stored records, the ring throttle,
+dead-token pruning, and the JWT signing against a freshly generated RSA key. The stubbed
+`fetch` asserts on what *would* have been sent, which is what makes the "data-only and high
+priority" test meaningful: those two properties are the difference between a push that wakes a
+sleeping phone and one that quietly does nothing.
 
 ## Protocol
 

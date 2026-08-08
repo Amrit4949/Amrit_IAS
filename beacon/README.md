@@ -8,8 +8,9 @@ ring the other — on the same Wi-Fi, or on opposite sides of the country.
 
 **Just want to use it?** Download the app from
 [the latest build](https://github.com/Amrit4949/Amrit_IAS/releases/tag/beacon-latest), and
-follow [SETUP.md](SETUP.md) if you want it to work when the phones are far apart. The rest of
-this file is about how it works inside.
+follow [SETUP.md](SETUP.md) to make it work when the phones are far apart — that is a
+click-only walkthrough, no terminal needed. The rest of this file is about how it works
+inside.
 
 ---
 
