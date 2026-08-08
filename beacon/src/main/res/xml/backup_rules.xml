@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The circle code is a shared secret; it should be typed on a new phone, never restored. -->
+<full-backup-content>
+    <exclude domain="file" path="datastore" />
+    <exclude domain="sharedpref" path="." />
+</full-backup-content>

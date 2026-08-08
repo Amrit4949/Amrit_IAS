@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Compose paints the real UI; these window themes exist only so the frame before the
+        first composition matches, instead of flashing white on a dark phone.
+    -->
+    <style name="Theme.Beacon" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
+    </style>
+
+    <style name="Theme.Beacon.Alert" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/alert_red</item>
+        <item name="android:statusBarColor">@color/alert_red</item>
+        <item name="android:navigationBarColor">@color/alert_red</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+</resources>

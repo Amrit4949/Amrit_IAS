@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "VideoHub"
 include(":app")
+include(":beacon")

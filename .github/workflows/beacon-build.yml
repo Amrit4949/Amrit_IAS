@@ -1,0 +1,51 @@
+name: Build Beacon APK
+
+on:
+  push:
+    paths:
+      - 'beacon/**'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - '.github/workflows/beacon-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.5
+
+      # Only the :beacon module. The unrelated :app module in this repo pulls large
+      # native dependencies that have nothing to do with this build.
+      - name: Run unit tests
+        run: gradle :beacon:testDebugUnitTest
+
+      - name: Build debug APK
+        run: gradle :beacon:assembleDebug
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beacon-test-report
+          path: beacon/build/reports/tests/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: beacon-debug-apk
+          path: beacon/build/outputs/apk/debug/beacon-debug.apk

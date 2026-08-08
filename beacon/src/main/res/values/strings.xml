@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Beacon</string>
+
+    <!-- Actions -->
+    <string name="action_stop">Stop</string>
+    <string name="action_ring">Ring</string>
+    <string name="action_open">Open</string>
+    <string name="action_show">Show code</string>
+    <string name="action_hide">Hide code</string>
+    <string name="action_leave_circle">Leave circle</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+
+    <!-- Notification channels -->
+    <string name="channel_listening_name">Findable</string>
+    <string name="channel_listening_description">A quiet, ongoing notification shown while this phone can be found by your other devices.</string>
+    <string name="channel_alert_name">Alerts</string>
+    <string name="channel_alert_description">The full-volume alert raised when one of your other phones asks this one to ring.</string>
+
+    <!-- Listener notification -->
+    <string name="notification_listening_title">Beacon is listening</string>
+    <string name="notification_listening_unpaired">Not in a circle yet</string>
+    <string name="notification_listening_alone">No other phones found yet</string>
+    <plurals name="notification_listening_peers">
+        <item quantity="one">%1$d phone nearby</item>
+        <item quantity="other">%1$d phones nearby</item>
+    </plurals>
+
+    <!-- Alert notification -->
+    <string name="notification_alert_title">Beacon alert</string>
+    <string name="notification_alert_from">Triggered by %1$s</string>
+    <string name="notification_alert_generic">Someone in your circle is looking for this phone</string>
+
+    <!-- Alert screen -->
+    <string name="alert_headline">Found it?</string>
+    <string name="alert_from">%1$s is looking for this phone</string>
+    <string name="alert_local_test">Test from this phone</string>
+
+    <!-- Pairing -->
+    <string name="pair_title">Pair your phones</string>
+    <string name="pair_subtitle">Type the same code on every phone you want in your circle. Any of them can then make the others ring, even on silent.</string>
+    <string name="pair_create_title">Start a new circle</string>
+    <string name="pair_create_body">Generates a code for this phone. Type it into your other phone next.</string>
+    <string name="pair_create_action">Create a code</string>
+    <string name="pair_created_body">Type this on your other phone, then keep it somewhere safe. Anyone with this code can make your phones ring.</string>
+    <string name="pair_join_title">Join an existing circle</string>
+    <string name="pair_join_body">Enter the code shown on your other phone.</string>
+    <string name="pair_code_label">Circle code</string>
+    <string name="pair_invalid">That code is not complete yet.</string>
+    <string name="pair_join_action">Join</string>
+    <string name="pair_privacy_note">Beacon has no account and no server. The code never leaves your phones, and they talk directly over your Wi-Fi.</string>
+
+    <!-- Home -->
+    <string name="home_this_phone">This phone: %1$s</string>
+    <string name="home_intensity">How loud</string>
+    <string name="home_peers">Your other phones</string>
+    <string name="home_test_here">Test the alert on this phone</string>
+    <string name="home_circle_code">Circle code</string>
+    <string name="home_footer">Alerts stop themselves after three minutes so a lost phone keeps some battery.</string>
+    <string name="home_empty_searching">Looking for your other phones…</string>
+    <string name="home_empty_starting">Starting up…</string>
+    <string name="home_empty_failed">Could not start network discovery on this phone.</string>
+    <string name="home_empty_hint">Both phones need Beacon open at least once, the same circle code, and the same Wi-Fi network.</string>
+
+    <string name="rename_title">Name this phone</string>
+    <string name="rename_label">Shown on your other phones</string>
+
+    <!-- Setup checklist -->
+    <string name="setup_title">Finish setting up</string>
+    <string name="setup_subtitle">Until these are granted, this phone may stay silent when your other phone rings it.</string>
+    <string name="setup_notifications_title">Notifications</string>
+    <string name="setup_notifications_body">Required to wake the screen when an alert arrives.</string>
+    <string name="setup_dnd_title">Do Not Disturb override</string>
+    <string name="setup_dnd_body">Lets the alert through when Do Not Disturb is on.</string>
+    <string name="setup_fsi_title">Full-screen alerts</string>
+    <string name="setup_fsi_body">Lets the alert take over the lock screen instead of showing a banner.</string>
+    <string name="setup_battery_title">Unrestricted battery</string>
+    <string name="setup_battery_body">Stops Android from putting the listener to sleep.</string>
+    <string name="setup_autostart_title">%1$s background settings</string>
+    <string name="setup_autostart_body">Turn on Autostart and set battery use to No restrictions, or this phone will stop being findable.</string>
+</resources>
