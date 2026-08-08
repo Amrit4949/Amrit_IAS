@@ -170,6 +170,10 @@ https://beacon-relay.yourname.workers.dev/health
 
 It should just say **ok**. If it does, your server is alive.
 
+> **If it says `POST only`** your server is running fine — it is just an older copy that did
+> not answer browser visits. Redeploy from Cloudflare to pick up the fix, or ignore it: the
+> app never uses this page, so it changes nothing about whether your phones ring.
+
 ---
 
 # Part 6 — Put it on your phones

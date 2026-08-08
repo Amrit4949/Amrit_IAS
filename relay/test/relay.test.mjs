@@ -145,8 +145,21 @@ await check('an oversized body is refused', async () => {
   eq((await post('/ring', 'x'.repeat(5000))).status, 413, 'status');
 });
 
-await check('health check answers', async () => {
+await check('health check answers a POST', async () => {
   eq(await (await post('/health', '')).text(), 'ok', 'reply');
+});
+
+await check('health check answers a browser visit', async () => {
+  // A GET, which is what happens when someone pastes the URL into their address bar to
+  // confirm their deployment worked. Regression test: this used to answer "POST only".
+  const response = await worker.fetch(new Request('https://relay.test/health'), env);
+  eq(response.status, 200, 'status');
+  eq(await response.text(), 'ok', 'reply');
+});
+
+await check('other endpoints still refuse a GET', async () => {
+  const response = await worker.fetch(new Request('https://relay.test/ring'), env);
+  eq(response.status, 405, 'status');
 });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

@@ -31,6 +31,13 @@ const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
 export default {
   async fetch(request, env) {
+    // Answered before the method check on purpose: this is the endpoint someone pastes into
+    // a browser to see whether their deployment worked, and a browser sends GET. A health
+    // check you cannot reach from the address bar is not a health check.
+    if (new URL(request.url).pathname === '/health') {
+      return text('ok');
+    }
+
     if (request.method !== 'POST') {
       return text('POST only', 405);
     }
@@ -47,8 +54,6 @@ export default {
           return await handleRing(raw, env);
         case '/peers':
           return await handlePeers(raw, env);
-        case '/health':
-          return text('ok');
         default:
           return text('not found', 404);
       }
