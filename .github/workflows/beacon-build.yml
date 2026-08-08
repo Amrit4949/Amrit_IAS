@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      # Secrets cannot be used directly in an `if:`, so the presence check is hoisted into a
+      # plain string here and the Firebase steps test that instead.
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
 
     steps:
       - name: Checkout source
@@ -31,14 +35,28 @@ jobs:
         with:
           gradle-version: 8.5
 
+      # Written before any Gradle run, because the build decides whether to apply the Firebase
+      # plugin by looking for this file at configuration time.
+      - name: Add Firebase config (only if the secret is set)
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > beacon/google-services.json
+
       # Only the :beacon module. The unrelated :app module in this repo pulls large
       # native dependencies that have nothing to do with this build.
       - name: Run unit tests
         run: gradle :beacon:testLanDebugUnitTest
 
-      # The lan flavor needs no google-services.json, so it is the one CI can prove.
-      - name: Build debug APK
+      # The lan flavor needs no google-services.json, so it always builds.
+      - name: Build the Wi-Fi app
         run: gradle :beacon:assembleLanDebug
+
+      # The cloud flavor needs the owner's Firebase config, so it is built only when one was
+      # supplied. Nothing here fails a repository that has not set it up.
+      - name: Build the anywhere app
+        if: env.HAS_FIREBASE == 'true'
+        run: gradle :beacon:assembleCloudDebug
 
       - name: Upload test report on failure
         if: failure()
@@ -47,29 +65,36 @@ jobs:
           name: beacon-test-report
           path: beacon/build/reports/tests/
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: beacon-debug-apk
-          path: beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk
-
-      # Artifacts can only be downloaded from a logged-in desktop browser, which is the wrong
-      # place when you want the app on a phone. A release gives a plain public link that any
-      # phone browser can open.
+      # A release gives a plain public link any phone browser can open. Workflow artifacts
+      # can only be downloaded from a logged-in desktop browser, which is the wrong place
+      # when the goal is installing on a phone.
       - name: Publish to the "beacon-latest" release
         if: github.ref_name == 'claude/android-bypass-silent-mode-990lcw'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk beacon.apk
+          cp beacon/build/outputs/apk/lan/debug/beacon-lan-debug.apk beacon-wifi.apk
+          FILES="beacon-wifi.apk"
+          EXTRA="Only the Wi-Fi app is built, because no Firebase config has been added yet. See beacon/SETUP.md."
+
+          if [ -f beacon/build/outputs/apk/cloud/debug/beacon-cloud-debug.apk ]; then
+            cp beacon/build/outputs/apk/cloud/debug/beacon-cloud-debug.apk beacon-anywhere.apk
+            FILES="$FILES beacon-anywhere.apk"
+            EXTRA="Install **beacon-anywhere.apk** on every phone, then paste your relay address into Distant phones > Change."
+          fi
+
           gh release delete beacon-latest --yes --cleanup-tag || true
-          gh release create beacon-latest beacon.apk \
+          gh release create beacon-latest $FILES \
             --title "Beacon (latest build)" \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --notes "Newest test build of the Beacon app.
+            --notes "Newest test build of the Beacon app. Open this page on your phone and tap a file below to install it.
 
-          Download **beacon.apk** below and install it on your phone.
+          | File | What it does |
+          | --- | --- |
+          | \`beacon-wifi.apk\` | Rings your phones when they are on the same Wi-Fi. No setup at all. |
+          | \`beacon-anywhere.apk\` | Also rings them from anywhere. Needs the setup in beacon/SETUP.md. |
 
-          This is the \`lan\` build: it rings phones on the same Wi-Fi with no setup at all.
-          To ring phones anywhere, see beacon/README.md."
+          $EXTRA
+
+          Android will warn that this is from an unknown source, because it did not come from the Play Store. That is expected for an app you built yourself."

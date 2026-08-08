@@ -6,6 +6,11 @@ vibrate, and through Do Not Disturb.
 Both phones install the APK, both type the same short code, and from then on either one can
 ring the other — on the same Wi-Fi, or on opposite sides of the country.
 
+**Just want to use it?** Download the app from
+[the latest build](https://github.com/Amrit4949/Amrit_IAS/releases/tag/beacon-latest), and
+follow [SETUP.md](SETUP.md) if you want it to work when the phones are far apart. The rest of
+this file is about how it works inside.
+
 ---
 
 ## How the silent-mode override actually works
