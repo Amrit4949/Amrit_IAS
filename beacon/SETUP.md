@@ -107,15 +107,27 @@ page updates on its own within a few minutes.
    CIRCLES
    ```
 
-5. Click **Add**. You'll now see it listed with a long **Namespace ID** next to it. **Copy
-   that ID.**
+5. Click **Add**, then click **CIRCLES** in the list to open it.
+6. **The ID is in your browser's address bar.** The URL looks like:
+
+   ```
+   dash.cloudflare.com/<account id>/workers/kv/namespaces/edac0b10895048bbafe59b69f599ab47
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   ```
+
+   Copy the last part — the 32 characters after `/namespaces/`. That is your **Namespace ID**.
+   Ignore the other long string earlier in the URL; that is your account id, which is not what
+   you want here.
+
+   > This one is not a secret, unlike the private key from Part 3. It is just a name for your
+   > storage box.
 
 Now paste it into the project, still in your browser:
 
-6. Open
+7. Open
    **https://github.com/Amrit4949/Amrit_IAS/blob/claude/android-bypass-silent-mode-990lcw/relay/wrangler.toml**
-7. Click the **pencil icon** (top right) to edit.
-8. Find this line:
+8. Click the **pencil icon** (top right) to edit.
+9. Find this line:
 
    ```
    id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
@@ -127,7 +139,7 @@ Now paste it into the project, still in your browser:
    id = "8f3a2b1c9d4e5f6a7b8c9d0e1f2a3b4c"
    ```
 
-9. Click **Commit changes** at the top right, then **Commit changes** again in the popup.
+10. Click **Commit changes** at the top right, then **Commit changes** again in the popup.
 
 ---
 
