@@ -419,6 +419,33 @@
     font-size: 14px;
   }
 
+  .diag {
+    border: 1px solid var(--alert);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .diag h2 {
+    margin: 0;
+    font-family: "Chivo", ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px;
+    letter-spacing: -.01em;
+  }
+  .diag p { margin: 0; font-size: 14.5px; max-width: 60ch; }
+  .diag pre {
+    margin: 0;
+    padding: 12px;
+    background: var(--sunk);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    overflow-x: auto;
+    font: 400 12px/1.6 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--muted);
+    white-space: pre;
+  }
+
   .fine {
     color: var(--muted);
     font-size: 13px;
@@ -523,6 +550,12 @@
     <p class="empty" id="queueEmpty">Empty. Anything you load lands here, and Earshot rolls on to the next one when a track ends.</p>
   </section>
 
+  <section class="diag" id="diag" hidden aria-live="polite">
+    <h2>Why it isn't playing</h2>
+    <p id="diagLead"></p>
+    <pre id="diagBody"></pre>
+  </section>
+
   <footer class="fine">
     <p>Earshot plays through YouTube's own embedded player with the video surface hidden, so you get the highest-quality audio stream YouTube serves for that upload — adaptive AAC or Opus, typically 128–160&nbsp;kbps. Nothing is downloaded, re-encoded, or stored.</p>
     <p>A few uploads have embedding switched off by their owner; those report an error here and have to be opened on YouTube. If a track loads but stays silent, hit <kbd>Show picture</kbd> and press play once — some browsers demand a click on the player itself before they will let sound through.</p>
@@ -535,6 +568,7 @@
   "use strict";
 
   var YT = "https://www.youtube.com";
+  var YT_ALT = "https://www.youtube-nocookie.com";
   var $ = function (id) { return document.getElementById(id); };
 
   var els = {
@@ -548,11 +582,12 @@
     vol: $("vol"), mute: $("muteBtn"), rate: $("rate"),
     picture: $("pictureBtn"), ytLink: $("ytLink"),
     stage: $("stage"), mount: $("mount"),
-    list: $("queueList"), empty: $("queueEmpty")
+    list: $("queueList"), empty: $("queueEmpty"),
+    diag: $("diag"), diagLead: $("diagLead"), diagBody: $("diagBody")
   };
 
   var S = {
-    queue: [], index: -1, frame: null, ready: false, handshake: null, watch: null,
+    queue: [], index: -1, frame: null, host: null, retried: false, ready: false, handshake: null, watch: null,
     playing: false, time: 0, timeAt: 0, duration: 0, buffered: 0,
     rate: 1, volume: 80, muted: false, seeking: false, seekRatio: 0
   };
@@ -610,7 +645,7 @@
 
   /* ---------- player plumbing (postMessage to the YouTube embed) ---------- */
 
-  function frameSrc(item) {
+  function frameSrc(item, host) {
     var p = new URLSearchParams({
       enablejsapi: "1", autoplay: "1", playsinline: "1", rel: "0",
       modestbranding: "1", iv_load_policy: "3", vq: "hd1080"
@@ -619,18 +654,19 @@
     if (item.kind === "playlist") {
       p.set("listType", "playlist");
       p.set("list", item.id);
-      return YT + "/embed/videoseries?" + p.toString();
+      return host + "/embed/videoseries?" + p.toString();
     }
     if (item.start) p.set("start", String(item.start));
-    return YT + "/embed/" + item.id + "?" + p.toString();
+    return host + "/embed/" + item.id + "?" + p.toString();
   }
 
-  function build(item) {
+  function build(item, host) {
+    S.host = host || YT;
     var f = document.createElement("iframe");
     f.title = "YouTube audio source";
     f.allow = "autoplay; encrypted-media; picture-in-picture";
     f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-    f.src = frameSrc(item);
+    f.src = frameSrc(item, S.host);
     els.mount.innerHTML = "";
     els.mount.appendChild(f);
     S.frame = f;
@@ -639,14 +675,52 @@
     watchdog();
   }
 
+  /* ---------- evidence, for when the embed will not load ---------- */
+
+  var blocks = [], replies = 0;
+
+  document.addEventListener("securitypolicyviolation", function (e) {
+    var line = (e.violatedDirective || "?") + " blocked " + (e.blockedURI || "?");
+    if (blocks.indexOf(line) === -1) blocks.push(line);
+  });
+
+  function sandboxed() {
+    try { window.localStorage.getItem("earshot"); return false; } catch (e) { return true; }
+  }
+
+  function report() {
+    var framed = blocks.join(" ").indexOf("frame") !== -1;
+    els.diagLead.textContent = framed
+      ? "This viewer blocks embedded YouTube frames at the security-policy level. No version of this page can play audio here — open it on a normal web host, or save the file and open it in your browser."
+      : sandboxed()
+        ? "The player landed in a sandboxed frame with no storage access, which YouTube's own scripts need to start. Open the page on a normal web host, or save the file and open it in your browser."
+        : "The player frame never answered. Usually that means youtube.com is unreachable from this network, or a content blocker stripped the embed.";
+    els.diagBody.textContent = [
+      "page origin     " + (window.origin || location.origin || "null"),
+      "same-origin     " + (sandboxed() ? "withheld (sandboxed)" : "available"),
+      "player frame    " + (S.frame ? "created" : "never created"),
+      "frame source    " + (S.frame ? String(S.frame.src).split("?")[0] : "\u2014"),
+      "player replies  " + replies,
+      "policy blocks   " + (blocks.length ? blocks.join("\n                ") : "none reported")
+    ].join("\n");
+    els.diag.hidden = false;
+  }
+
   function watchdog() {
     clearTimeout(S.watch);
     S.watch = setTimeout(function () {
-      if (!S.ready) {
-        say("The YouTube player did not load. Some embedded views block it — open this page in its own tab, or use Open on YouTube.");
-        els.stateText.textContent = "Blocked";
+      if (S.ready) return;
+      if (!S.retried && S.queue[S.index]) {
+        S.retried = true;
+        els.stateText.textContent = "Retrying";
+        say("The player did not answer \u2014 trying YouTube's no-cookie host.");
+        build(S.queue[S.index], YT_ALT);
+        return;
       }
-    }, 8000);
+      say("The YouTube player did not load.");
+      els.stateText.textContent = "Blocked";
+      report();
+    }, 6000);
   }
 
   function handshake() {
@@ -663,7 +737,7 @@
     if (!S.frame || !S.frame.contentWindow) return;
     msg.id = 1;
     msg.channel = "widget";
-    try { S.frame.contentWindow.postMessage(JSON.stringify(msg), YT); } catch (e) {}
+    try { S.frame.contentWindow.postMessage(JSON.stringify(msg), S.host || YT); } catch (e) {}
   }
 
   function cmd(func, args) {
@@ -677,6 +751,8 @@
       try { data = JSON.parse(data); } catch (err) { return; }
     }
     if (!data || typeof data !== "object") return;
+    replies++;
+    els.diag.hidden = true;
 
     if (data.event === "onReady" || data.event === "initialDelivery") {
       S.ready = true;
@@ -686,6 +762,7 @@
       cmd("setVolume", [S.volume]);
       cmd("setPlaybackRate", [S.rate]);
       if (S.muted) cmd("mute"); else cmd("unMute");
+      if (S.host === YT_ALT) els.quality.textContent = "audio · no-cookie host";
     }
     if (data.info != null) absorb(data.info);
     if (data.event === "onStateChange" && typeof data.info === "number") absorb({ playerState: data.info });
@@ -811,7 +888,8 @@
     say("");
 
     if (!S.frame) {
-      build(item);
+      S.retried = false;
+      build(item, YT);
     } else if (item.kind === "playlist") {
       cmd("loadPlaylist", [{ list: item.id, listType: "playlist", index: 0 }]);
     } else {
