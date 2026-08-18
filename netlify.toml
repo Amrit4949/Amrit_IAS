@@ -1,7 +1,13 @@
-# Publishes the Earshot web player (web/dist) — the Android app is built by GitHub Actions, not here.
+# Publishes the Earshot web player. There is no build step — web/earshot.html
+# is a single self-contained file — so the whole "web" folder is served as-is
+# and the root path rewrites to it. The Android app is built by GitHub Actions.
 [build]
-  publish = "web/dist"
-  command = ""
+  publish = "web"
+
+[[redirects]]
+  from = "/"
+  to = "/earshot.html"
+  status = 200
 
 [[headers]]
   for = "/*"
