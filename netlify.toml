@@ -1,0 +1,10 @@
+# Publishes the Earshot web player (web/dist) — the Android app is built by GitHub Actions, not here.
+[build]
+  publish = "web/dist"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
