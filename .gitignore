@@ -20,3 +20,6 @@ local.properties
 /alarm-app/app/build
 /alarm-app/out
 /alarm-app/local.properties
+
+# APK handed over in chat, not source
+/dist/
