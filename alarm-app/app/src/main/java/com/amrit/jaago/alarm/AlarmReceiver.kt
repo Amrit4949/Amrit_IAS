@@ -19,7 +19,13 @@ class AlarmReceiver : BroadcastReceiver() {
             return
         }
 
-        AlarmService.ring(context, alarmId)
+        try {
+            AlarmService.ring(context, alarmId)
+        } catch (t: Throwable) {
+            // Android can refuse a foreground service start if the exact alarm
+            // allow-list window was missed. Never crash the receiver over it.
+            Log.e(TAG, "Could not start the alarm service", t)
+        }
 
         // Re-arm straight away so tomorrow is covered even if this one is never solved.
         if (alarm.days.isNotEmpty()) {

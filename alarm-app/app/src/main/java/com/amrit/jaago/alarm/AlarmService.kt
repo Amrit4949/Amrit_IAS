@@ -72,6 +72,10 @@ class AlarmService : Service() {
 
         if (currentAlarm?.id == alarm.id && player != null) return // already ringing
 
+        // A different alarm arriving mid-ring: silence the old one first.
+        player?.stop()
+        player = null
+
         currentAlarm = alarm
         _ringingAlarmId.value = alarm.id
         _ringingSince.value = System.currentTimeMillis()
