@@ -13,3 +13,10 @@
 .cxx
 local.properties
 /app/build
+
+# Jaago alarm app build output
+/alarm-app/.gradle
+/alarm-app/build
+/alarm-app/app/build
+/alarm-app/out
+/alarm-app/local.properties
