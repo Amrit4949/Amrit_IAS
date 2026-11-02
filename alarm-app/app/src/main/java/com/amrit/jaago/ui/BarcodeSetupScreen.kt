@@ -144,7 +144,6 @@ fun BarcodeSetupScreen(
                             focusedLabelColor = Scan1,
                             unfocusedLabelColor = TextLo,
                             cursorColor = Scan1,
-                            textColor = TextHi,
                             containerColor = Slate2
                         ),
                         shape = RoundedCornerShape(16.dp),

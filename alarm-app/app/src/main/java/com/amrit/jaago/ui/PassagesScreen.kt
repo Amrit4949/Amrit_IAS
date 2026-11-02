@@ -103,7 +103,6 @@ fun PassagesScreen(onBack: () -> Unit) {
                             focusedLabelColor = Type1,
                             unfocusedLabelColor = TextLo,
                             cursorColor = Type1,
-                            textColor = TextHi,
                             containerColor = Slate2
                         ),
                         shape = RoundedCornerShape(16.dp),

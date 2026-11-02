@@ -528,6 +528,5 @@ private fun fieldColors(accent: Color) = TextFieldDefaults.outlinedTextFieldColo
     focusedLabelColor = accent,
     unfocusedLabelColor = TextLo,
     cursorColor = accent,
-    textColor = TextHi,
     containerColor = Slate2
 )

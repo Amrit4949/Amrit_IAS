@@ -418,7 +418,6 @@ fun TypingStep(
                     focusedLabelColor = accent,
                     unfocusedLabelColor = TextLo,
                     cursorColor = accent,
-                    textColor = TextHi,
                     containerColor = Slate2
                 ),
                 shape = RoundedCornerShape(16.dp),
