@@ -1,39 +1,56 @@
 package com.amrit.jaago.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.amrit.jaago.R
+import com.amrit.jaago.ui.theme.GhostButton
+import com.amrit.jaago.ui.theme.GlassCard
+import com.amrit.jaago.ui.theme.GradientButton
 import com.amrit.jaago.ui.theme.Good
+import com.amrit.jaago.ui.theme.Hairline
+import com.amrit.jaago.ui.theme.IconBadge
+import com.amrit.jaago.ui.theme.PageBackground
+import com.amrit.jaago.ui.theme.Scan1
+import com.amrit.jaago.ui.theme.Scan2
+import com.amrit.jaago.ui.theme.ScreenHeader
+import com.amrit.jaago.ui.theme.SectionLabel
+import com.amrit.jaago.ui.theme.Slate
+import com.amrit.jaago.ui.theme.Slate2
+import com.amrit.jaago.ui.theme.TextHi
+import com.amrit.jaago.ui.theme.TextLo
+import com.amrit.jaago.ui.theme.TextMid
 
 /**
- * Scan the code once while setting the alarm. Only its text is stored, nothing else,
- * and it never leaves the phone.
+ * Scan the code once while setting the alarm. Only its text is stored, on this
+ * phone, and the app has no internet permission to send it anywhere.
  */
 @Composable
 fun BarcodeSetupScreen(
@@ -44,42 +61,41 @@ fun BarcodeSetupScreen(
     var detectedFormat by remember { mutableStateOf("") }
     var label by remember { mutableStateOf("") }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text("Scan your code") },
-                navigationIcon = {
-                    IconButton(onClick = onCancel) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
-        }
-    ) { padding ->
+    Box(modifier = Modifier.fillMaxSize()) {
+        PageBackground(glow = Scan1)
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             val value = detectedValue
+            ScreenHeader(
+                title = if (value == null) "Scan a code" else "Code captured",
+                subtitle = if (value == null) "Any barcode or QR will do" else "Give it a reminder label",
+                onBack = onCancel
+            )
+
             if (value == null) {
-                Text(
-                    "Point the camera at any barcode or QR code. A toothpaste tube, a book, a packet of biscuits, a printed QR sheet, anything that will still be around tomorrow.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                GlassCard(accent = Scan1) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(iconRes = R.drawable.ic_qr, from = Scan1, to = Scan2)
+                        Spacer(Modifier.width(13.dp))
+                        Text(
+                            "A toothpaste tube, a book, a packet of biscuits, a printed QR sheet. Anything that will still be there tomorrow morning.",
+                            fontSize = 13.sp,
+                            color = TextMid,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .height(400.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Slate, RoundedCornerShape(24.dp))
                 ) {
                     WithCameraPermission {
                         BarcodeScannerView(modifier = Modifier.fillMaxSize()) { scanned, format ->
@@ -88,55 +104,89 @@ fun BarcodeSetupScreen(
                                 detectedFormat = format
                             }
                         }
+                        ScanFrame(accent = Scan1, modifier = Modifier.fillMaxSize())
                     }
                 }
             } else {
-                SectionCard(title = "Got it") {
-                    Text(detectedFormat, style = MaterialTheme.typography.titleMedium, color = Good)
+                GlassCard(accent = Good, lit = true) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconBadge(iconRes = R.drawable.ic_qr, from = Good, to = Good, solid = true)
+                        Spacer(Modifier.width(13.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                detectedFormat,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Good
+                            )
+                            Text(maskValue(value), fontSize = 13.sp, color = TextMid)
+                        }
+                    }
                     Text(
-                        text = maskValue(value),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "Only this code will unlock the alarm. Keep the object safe.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "Only this exact code will unlock the alarm. Keep the object safe, and put it somewhere that makes you stand up.",
+                        fontSize = 12.5.sp,
+                        color = TextLo,
+                        lineHeight = 17.sp
                     )
                 }
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it.take(40) },
-                    label = { Text("A reminder of where it is") },
-                    singleLine = true,
+
+                GlassCard {
+                    SectionLabel("Where will you keep it?")
+                    OutlinedTextField(
+                        value = label,
+                        onValueChange = { label = it.take(40) },
+                        label = { Text("For example, on the bathroom shelf") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            focusedBorderColor = Scan1.copy(alpha = 0.7f),
+                            unfocusedBorderColor = Hairline,
+                            focusedLabelColor = Scan1,
+                            unfocusedLabelColor = TextLo,
+                            cursorColor = Scan1,
+                            textColor = TextHi,
+                            containerColor = Slate2
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        "This shows on the alarm screen at five in the morning, when you will not remember.",
+                        fontSize = 12.sp,
+                        color = TextLo,
+                        lineHeight = 17.sp
+                    )
+                }
+
+                GradientButton(
+                    text = "Use this code",
+                    onClick = { onSaved(value, detectedFormat, label) },
+                    from = Scan1,
+                    to = Scan2,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Button(
-                    onClick = { onSaved(value, detectedFormat, label) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Use this code", fontWeight = FontWeight.Bold)
-                }
-                OutlinedButton(
+                GhostButton(
+                    text = "Scan something else",
                     onClick = {
                         detectedValue = null
                         detectedFormat = ""
                     },
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Scan something else")
-                }
+                )
             }
+            Spacer(Modifier.height(30.dp))
         }
     }
 }
 
-/** Shows enough of the code to recognise it, not enough to type it from memory. */
+/** Enough of the code to recognise it, not enough to type it from memory. */
 private fun maskValue(value: String): String {
     val trimmed = value.trim()
     return when {
-        trimmed.length <= 4 -> "Code of ${trimmed.length} characters"
-        trimmed.length <= 10 -> trimmed.take(2) + "*".repeat(trimmed.length - 4) + trimmed.takeLast(2)
-        else -> trimmed.take(3) + "*".repeat(6) + trimmed.takeLast(3) + "  (${trimmed.length} characters)"
+        trimmed.length <= 4 -> "${trimmed.length} characters"
+        trimmed.length <= 10 ->
+            trimmed.take(2) + "*".repeat(trimmed.length - 4) + trimmed.takeLast(2)
+        else ->
+            trimmed.take(3) + "*".repeat(6) + trimmed.takeLast(3) + "   ${trimmed.length} characters"
     }
 }

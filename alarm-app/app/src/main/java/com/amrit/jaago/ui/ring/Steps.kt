@@ -1,5 +1,10 @@
 package com.amrit.jaago.ui.ring
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -7,21 +12,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -32,16 +37,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -50,18 +60,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.text.KeyboardOptions
 import com.amrit.jaago.challenge.MathChallenge
 import com.amrit.jaago.challenge.TypingChallenge
 import com.amrit.jaago.model.ChallengeSpec
 import com.amrit.jaago.model.MathDifficulty
 import com.amrit.jaago.model.TypingDifficulty
 import com.amrit.jaago.ui.BarcodeScannerView
+import com.amrit.jaago.ui.ScanFrame
 import com.amrit.jaago.ui.WithCameraPermission
-import com.amrit.jaago.ui.theme.Cool
-import com.amrit.jaago.ui.theme.Danger
+import com.amrit.jaago.ui.theme.Bad
 import com.amrit.jaago.ui.theme.Good
-import com.amrit.jaago.ui.theme.Warn
+import com.amrit.jaago.ui.theme.Hairline
+import com.amrit.jaago.ui.theme.Scan1
+import com.amrit.jaago.ui.theme.Slate
+import com.amrit.jaago.ui.theme.Slate2
+import com.amrit.jaago.ui.theme.TextHi
+import com.amrit.jaago.ui.theme.TextLo
+import com.amrit.jaago.ui.theme.TextMid
 import kotlinx.coroutines.delay
 
 // ---------------------------------------------------------------------------
@@ -73,6 +88,7 @@ fun MathStep(
     difficulty: MathDifficulty,
     count: Int,
     heading: String,
+    accent: Color,
     onSolved: () -> Unit
 ) {
     var solved by remember(difficulty, count) { mutableStateOf(0) }
@@ -80,6 +96,8 @@ fun MathStep(
     var input by remember(difficulty, count) { mutableStateOf("") }
     var lockSeconds by remember(difficulty, count) { mutableStateOf(0) }
     var message by remember(difficulty, count) { mutableStateOf<String?>(null) }
+    var wasRight by remember(difficulty, count) { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(lockSeconds) {
         if (lockSeconds > 0) {
@@ -93,6 +111,7 @@ fun MathStep(
         val given = input.trim().toIntOrNull()
         if (given == null) {
             message = "Type a number first"
+            wasRight = false
             return
         }
         if (given == question.answer) {
@@ -104,10 +123,11 @@ fun MathStep(
             solved = next
             question = MathChallenge.generate(difficulty)
             input = ""
+            wasRight = true
             message = "Correct. ${count - next} to go."
         } else {
-            // A fresh question plus a short wait, so tapping numbers at random is slower
-            // than simply doing the sum.
+            // A fresh question plus a short wait: guessing is slower than thinking.
+            wasRight = false
             message = "Wrong. Here is another one."
             lockSeconds = 3
             question = MathChallenge.generate(difficulty)
@@ -117,42 +137,64 @@ fun MathStep(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        StepHeading(heading, "$solved of $count solved")
+        StepHeading(heading, "$solved of $count solved", accent)
 
-        Text(
-            text = question.prompt,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-        )
-
-        Text(
-            text = input.ifEmpty { "_" },
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Bold,
-            color = Cool,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        message?.let { text ->
+        // The question and the answer, in one lit panel.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Slate, RoundedCornerShape(22.dp))
+                .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(22.dp))
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                text = if (lockSeconds > 0) "$text Wait $lockSeconds." else text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (text.startsWith("Correct")) Good else Danger,
+                text = question.prompt,
+                fontSize = if (question.prompt.length > 34) 19.sp else 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextHi,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                lineHeight = 30.sp
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(accent.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = input.ifEmpty { "–" },
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accent
+                )
+            }
+            message?.let { text ->
+                Text(
+                    text = if (lockSeconds > 0) "$text  wait $lockSeconds" else text,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (wasRight) Good else Bad,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
-
-        Spacer(Modifier.height(2.dp))
 
         Keypad(
             enabled = lockSeconds == 0,
-            onDigit = { digit -> if (input.length < 9) input += digit },
+            accent = accent,
+            onDigit = { digit ->
+                if (input.length < 9) {
+                    input += digit
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            },
             onClear = { input = "" },
             onSubmit = { submit() },
             modifier = Modifier.weight(1f)
@@ -163,16 +205,13 @@ fun MathStep(
 @Composable
 private fun Keypad(
     enabled: Boolean,
+    accent: Color,
     onDigit: (Char) -> Unit,
     onClear: () -> Unit,
     onSubmit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rows = listOf(
-        listOf("7", "8", "9"),
-        listOf("4", "5", "6"),
-        listOf("1", "2", "3")
-    )
+    val rows = listOf(listOf("7", "8", "9"), listOf("4", "5", "6"), listOf("1", "2", "3"))
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEach { row ->
             Row(
@@ -180,12 +219,11 @@ private fun Keypad(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 row.forEach { key ->
-                    KeypadButton(
-                        text = key,
+                    Key(
+                        label = key,
                         enabled = enabled,
-                        modifier = Modifier.weight(1f).fillMaxSize(),
-                        onClick = { onDigit(key[0]) }
-                    )
+                        modifier = Modifier.weight(1f).fillMaxSize()
+                    ) { onDigit(key[0]) }
                 }
             }
         }
@@ -193,44 +231,62 @@ private fun Keypad(
             modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            KeypadButton(
-                text = "clear",
+            Key(
+                label = "clear",
                 enabled = enabled,
+                small = true,
                 modifier = Modifier.weight(1f).fillMaxSize(),
                 onClick = onClear
             )
-            KeypadButton(
-                text = "0",
+            Key(
+                label = "0",
                 enabled = enabled,
-                modifier = Modifier.weight(1f).fillMaxSize(),
-                onClick = { onDigit('0') }
-            )
-            Button(
-                onClick = onSubmit,
-                enabled = enabled,
-                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.weight(1f).fillMaxSize()
-            ) {
-                Text("Enter", fontWeight = FontWeight.Bold)
-            }
+            ) { onDigit('0') }
+            Key(
+                label = "enter",
+                enabled = enabled,
+                small = true,
+                fill = accent,
+                modifier = Modifier.weight(1f).fillMaxSize(),
+                onClick = onSubmit
+            )
         }
     }
 }
 
 @Composable
-private fun KeypadButton(
-    text: String,
+private fun Key(
+    label: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    small: Boolean = false,
+    fill: Color? = null,
     onClick: () -> Unit
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(14.dp),
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.93f else 1f)
+    val shape = RoundedCornerShape(18.dp)
+    Box(
         modifier = modifier
+            .scale(scale)
+            .clip(shape)
+            .background(fill ?: Slate2, shape)
+            .border(1.dp, if (fill == null) Hairline else Color.Transparent, shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled
+            ) { onClick() },
+        contentAlignment = Alignment.Center
     ) {
-        Text(text, fontSize = if (text.length > 1) 14.sp else 24.sp, fontWeight = FontWeight.Bold)
+        Text(
+            text = label,
+            fontSize = if (small) 14.sp else 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (fill != null) Color(0xFF14060A) else if (enabled) TextHi else TextLo
+        )
     }
 }
 
@@ -258,6 +314,7 @@ fun TypingStep(
     count: Int,
     strictCase: Boolean,
     heading: String,
+    accent: Color,
     onSolved: () -> Unit
 ) {
     var done by remember(difficulty, count) { mutableStateOf(0) }
@@ -266,7 +323,7 @@ fun TypingStep(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(passage) {
-        delay(200)
+        delay(220)
         runCatching { focusRequester.requestFocus() }
     }
 
@@ -283,47 +340,66 @@ fun TypingStep(
         }
     }
 
-    val correctPrefix = TypingChallenge.correctPrefixLength(input, passage, strictCase)
+    val correct = TypingChallenge.correctPrefixLength(input, passage, strictCase)
     val mistakes = TypingChallenge.mistakeCount(input, passage, strictCase)
+    val progress = if (passage.isEmpty()) 0f else correct.toFloat() / passage.length
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        StepHeading(heading, if (count > 1) "$done of $count done" else "No pasting, no shortcuts")
+        StepHeading(
+            heading,
+            if (count > 1) "${done} of $count done" else "No pasting, no shortcuts",
+            accent
+        )
 
-        Text(
-            text = buildAnnotatedString {
-                passage.forEachIndexed { index, target ->
-                    val typed = input.getOrNull(index)
-                    val style = when {
-                        typed == null -> SpanStyle(color = Color(0xFF9AA0B5))
-                        TypingChallenge.charMatches(typed, target, strictCase) ->
-                            SpanStyle(color = Good)
-                        else -> SpanStyle(color = Color.White, background = Danger)
-                    }
-                    withStyle(style) { append(target) }
-                }
-            },
-            fontSize = 17.sp,
-            fontFamily = FontFamily.SansSerif,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .padding(4.dp)
-        )
+                .clip(RoundedCornerShape(20.dp))
+                .background(Slate, RoundedCornerShape(20.dp))
+                .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
+                .padding(16.dp)
+        ) {
+            Text(
+                text = buildAnnotatedString {
+                    passage.forEachIndexed { index, target ->
+                        val typed = input.getOrNull(index)
+                        val style = when {
+                            typed == null && index == input.length ->
+                                SpanStyle(color = TextHi, background = accent.copy(alpha = 0.45f))
+                            typed == null -> SpanStyle(color = TextLo)
+                            TypingChallenge.charMatches(typed, target, strictCase) ->
+                                SpanStyle(color = Good)
+                            else -> SpanStyle(color = Color.White, background = Bad)
+                        }
+                        withStyle(style) { append(target) }
+                    }
+                },
+                fontSize = 16.sp,
+                lineHeight = 25.sp
+            )
+        }
 
-        LinearProgressIndicator(
-            progress = if (passage.isEmpty()) 0f else correctPrefix.toFloat() / passage.length,
-            modifier = Modifier.fillMaxWidth()
-        )
+        ThinProgress(progress = progress, accent = accent)
 
-        Text(
-            text = "$correctPrefix of ${passage.length} characters" +
-                if (mistakes > 0) ",  $mistakes wrong" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (mistakes > 0) Danger else MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "$correct of ${passage.length}",
+                fontSize = 12.sp,
+                color = TextMid,
+                modifier = Modifier.weight(1f)
+            )
+            if (mistakes > 0) {
+                Text(
+                    "$mistakes wrong",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Bad
+                )
+            }
+        }
 
         CompositionLocalProvider(LocalTextToolbar provides NoClipboardToolbar) {
             OutlinedTextField(
@@ -336,12 +412,50 @@ fun TypingStep(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.None
                 ),
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = accent.copy(alpha = 0.7f),
+                    unfocusedBorderColor = Hairline,
+                    focusedLabelColor = accent,
+                    unfocusedLabelColor = TextLo,
+                    cursorColor = accent,
+                    textColor = TextHi,
+                    containerColor = Slate2
+                ),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
             )
         }
 
-        TextButton(onClick = { input = "" }) { Text("Start this passage again") }
-        Spacer(Modifier.height(120.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Slate2, RoundedCornerShape(12.dp))
+                .clickable { input = "" }
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Text("Start again", fontSize = 12.5.sp, color = TextMid)
+        }
+        Spacer(Modifier.height(150.dp))
+    }
+}
+
+@Composable
+private fun ThinProgress(progress: Float, accent: Color) {
+    val animated by animateFloatAsState(progress.coerceIn(0f, 1f))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .clip(CircleShape)
+            .background(Slate2, CircleShape)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(animated)
+                .height(6.dp)
+                .clip(CircleShape)
+                .background(accent, CircleShape)
+        )
     }
 }
 
@@ -375,18 +489,20 @@ fun BarcodeStep(
 
     Column(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         StepHeading(
-            "Scan your code",
-            if (spec.label.isBlank()) "The ${spec.format} you saved" else spec.label
+            "Find your code",
+            if (spec.label.isBlank()) "The ${spec.format} you saved" else spec.label,
+            Scan1
         )
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(24.dp))
+                .background(Slate, RoundedCornerShape(24.dp))
         ) {
             WithCameraPermission {
                 BarcodeScannerView(modifier = Modifier.fillMaxSize()) { value, _ ->
@@ -399,31 +515,53 @@ fun BarcodeStep(
                         wrongCode = true
                     }
                 }
+                ScanFrame(
+                    accent = if (wrongCode) Bad else Scan1,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            if (wrongCode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Bad, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        "Different code. Keep looking.",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1A0004)
+                    )
+                }
             }
         }
 
-        if (wrongCode) {
-            Text(
-                text = "That is a different code. Keep looking.",
-                color = Danger,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
         if (seconds >= 180) {
-            OutlinedButton(
-                onClick = onEscape,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Warn)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Slate2, RoundedCornerShape(16.dp))
+                    .border(1.dp, Hairline, RoundedCornerShape(16.dp))
+                    .clickable { onEscape() }
+                    .padding(vertical = 13.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text("I cannot find the code, give me the hard way out")
+                Text(
+                    "Cannot find it: give me the hard way out",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextMid
+                )
             }
         } else {
             Text(
                 text = "If the code is genuinely lost, a way out appears after three minutes.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                color = TextLo,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -440,12 +578,13 @@ fun HoldToStopStep(onSolved: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     var held by remember { mutableStateOf(0f) }
+    val accent = com.amrit.jaago.ui.theme.Alarm1
 
     LaunchedEffect(pressed) {
         if (pressed) {
             while (held < 1f) {
                 delay(40)
-                held = (held + 0.02f).coerceAtMost(1f)
+                held = (held + 0.022f).coerceAtMost(1f)
             }
             onSolved()
         } else {
@@ -458,36 +597,68 @@ fun HoldToStopStep(onSolved: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Button(
-            onClick = { },
-            interactionSource = interaction,
-            modifier = Modifier.fillMaxWidth().height(90.dp)
+        Box(
+            modifier = Modifier
+                .width(210.dp)
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null
+                ) { },
+            contentAlignment = Alignment.Center
         ) {
-            Text("Hold to stop", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = size.minDimension * 0.065f
+                drawCircle(
+                    color = Slate2,
+                    radius = (size.minDimension - stroke) / 2f,
+                    style = Stroke(width = stroke)
+                )
+                drawArc(
+                    color = accent,
+                    startAngle = -90f,
+                    sweepAngle = 360f * held,
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    topLeft = Offset(stroke / 2f, stroke / 2f),
+                    size = androidx.compose.ui.geometry.Size(
+                        size.width - stroke,
+                        size.height - stroke
+                    )
+                )
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Hold", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Text("to stop", fontSize = 14.sp, color = TextMid)
+            }
         }
-        Spacer(Modifier.height(16.dp))
-        LinearProgressIndicator(progress = held, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "No challenge is set on this alarm.",
+            fontSize = 12.5.sp,
+            color = TextLo
+        )
     }
 }
 
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun StepHeading(title: String, subtitle: String) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+private fun StepHeading(title: String, subtitle: String, accent: Color) {
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            color = accent,
+            textAlign = TextAlign.Center
         )
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+            fontSize = 12.sp,
+            color = TextLo,
+            textAlign = TextAlign.Center
         )
     }
 }
