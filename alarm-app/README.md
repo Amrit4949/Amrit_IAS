@@ -12,8 +12,17 @@ that needs a working brain and, if you want, a walk to another room.
 3. Unzip it, copy `Jaago-Alarm-debug.apk` to the phone, tap it and allow installation
    from unknown sources when Android asks.
 
-It is a debug build, so it is already signed and installs directly. No Play Store,
-no account, no internet permission at all.
+Every build is signed with the same key (`app/jaago.keystore`), so a new APK
+installs straight over the old one and keeps your alarms. No Play Store, no
+account, no internet permission at all.
+
+That key is in this public repository on purpose, so builds need no setup. The
+consequence: anyone could sign an APK that your phone would accept as a Jaago
+update. Only install Jaago APKs built from this repository.
+
+Builds made before the permanent key existed were each signed with a random
+one-off key. Moving from one of those to a current build needs a one-time
+uninstall.
 
 ## Dismiss challenges
 

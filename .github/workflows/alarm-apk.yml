@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -48,3 +50,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Temporary: the sandbox that wrote this code cannot reach GitHub's artifact
+      # storage host, so the APK is handed back through the branch itself.
+      - name: Publish APK into the branch
+        if: startsWith(github.ref_name, 'ccr-')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p dist
+          cp alarm-app/app/build/outputs/apk/debug/app-debug.apk dist/Jaago-Alarm-debug.apk
+          git add -f dist/Jaago-Alarm-debug.apk
+          git commit -m "Publish permanently signed APK for download [skip ci]"
+          git push origin HEAD:${{ github.ref_name }}

@@ -11,17 +11,37 @@ android {
         applicationId = "com.amrit.jaago"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        // Rises with every CI build, so Android always treats a new APK as an update.
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+        versionCode = 100 + runNumber
+        versionName = "1.3.$runNumber"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    // One permanent key for every build. Without it each CI machine invents a
+    // random debug key, and Android refuses to install an update signed by a
+    // different key ("App not installed"). The repo is public, so this key is
+    // public too: only ever install Jaago APKs built from this repository.
+    signingConfigs {
+        create("jaago") {
+            storeFile = file("jaago.keystore")
+            storeType = "pkcs12"
+            storePassword = "jaago-public-key"
+            keyAlias = "jaago"
+            keyPassword = "jaago-public-key"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("jaago")
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("jaago")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
