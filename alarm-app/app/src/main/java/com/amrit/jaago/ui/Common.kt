@@ -20,15 +20,15 @@ object SoundPreview {
     /** Which profile is sounding right now, so the UI can light that card up. */
     fun playing(): String? = playingId
 
-    fun toggle(context: Context, profile: SoundProfile) {
-        if (playingId == profile.id) stop() else play(context, profile)
+    fun toggle(context: Context, profile: SoundProfile, extraLoud: Boolean = true) {
+        if (playingId == profile.id) stop() else play(context, profile, extraLoud)
     }
 
-    fun play(context: Context, profile: SoundProfile) {
+    fun play(context: Context, profile: SoundProfile, extraLoud: Boolean = true) {
         stop()
         playingId = profile.id
         player = AlarmPlayer(context.applicationContext).also {
-            it.start(profile, forceMaxVolume = false, vibrate = false)
+            it.start(profile, volumePercent = null, vibrate = false, extraLoud = extraLoud)
         }
         handler.postDelayed(stopTask, 7000L)
     }

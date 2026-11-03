@@ -1,14 +1,23 @@
 package com.amrit.jaago.alarm
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.amrit.jaago.R
 
 object AlarmNotifications {
 
-    const val CHANNEL_RING = "jaago_ring"
+    /**
+     * A new channel id. Channel settings are frozen the first time a channel is
+     * created, and the first version of the app shipped a ringing notification
+     * that suppressed its own full screen intent. Starting a fresh channel makes
+     * sure every phone gets the high-importance, lock-screen-visible settings.
+     */
+    const val CHANNEL_ALARM = "jaago_alarm_v2"
     const val CHANNEL_INFO = "jaago_info"
+    private const val OLD_CHANNEL_RING = "jaago_ring"
 
     const val NOTIF_RING = 1001
     const val NOTIF_MISSED = 1002
@@ -17,31 +26,36 @@ object AlarmNotifications {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // The ringing channel is silent on purpose: AlarmPlayer makes the noise, not
-        // the notification, so the sound cannot be muted by lowering the ring volume.
-        val ring = NotificationChannel(
-            CHANNEL_RING,
-            context.getString(com.amrit.jaago.R.string.channel_ring_name),
+        runCatching { nm.deleteNotificationChannel(OLD_CHANNEL_RING) }
+
+        // No sound and no vibration on the channel itself: AlarmPlayer makes the
+        // noise on the alarm stream. The notification is NOT marked silent,
+        // because a silent notification is not allowed to launch its full screen
+        // intent or to pop up as a banner.
+        val alarm = NotificationChannel(
+            CHANNEL_ALARM,
+            context.getString(R.string.channel_ring_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = context.getString(com.amrit.jaago.R.string.channel_ring_desc)
+            description = context.getString(R.string.channel_ring_desc)
             setSound(null, null)
             enableVibration(false)
+            enableLights(true)
             setBypassDnd(true)
-            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             setShowBadge(false)
         }
 
         val info = NotificationChannel(
             CHANNEL_INFO,
-            context.getString(com.amrit.jaago.R.string.channel_info_name),
-            NotificationManager.IMPORTANCE_LOW
+            context.getString(R.string.channel_info_name),
+            NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = context.getString(com.amrit.jaago.R.string.channel_info_desc)
+            description = context.getString(R.string.channel_info_desc)
             setSound(null, null)
         }
 
-        nm.createNotificationChannel(ring)
+        nm.createNotificationChannel(alarm)
         nm.createNotificationChannel(info)
     }
 }

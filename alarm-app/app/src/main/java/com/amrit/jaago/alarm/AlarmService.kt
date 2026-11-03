@@ -12,6 +12,8 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -26,23 +28,36 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Keeps making noise until a challenge is solved. Running as a foreground service
- * is what stops Android from killing the alarm half way through.
+ * Keeps making noise until the missions are done, and keeps putting the alarm
+ * screen in front of you until you are looking at it.
+ *
+ * Three ways the screen is brought up, because phone makers block each of them
+ * somewhere:
+ *  1. a direct startActivity, which Android allows from the background only when
+ *     the user has granted "Display over other apps";
+ *  2. the notification's full screen intent, which Android launches by itself on
+ *     a locked or sleeping phone;
+ *  3. a tappable heads-up notification with a "Solve to stop" button, for when
+ *     the phone is unlocked and in use.
+ * All three are retried every few seconds while the alarm screen is not showing.
  */
 class AlarmService : Service() {
 
     private var player: AlarmPlayer? = null
-    private var wakeLock: PowerManager.WakeLock? = null
+    private var cpuLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private var currentAlarm: Alarm? = null
 
     private val autoSilenceTask = Runnable { autoSilence() }
+
     private val reRaiseTask = object : Runnable {
         override fun run() {
             val alarm = currentAlarm ?: return
-            // Re-posting the notification pulls the full screen alarm back to the
-            // front if the user wandered off to another app without solving it.
-            notify(alarm)
+            if (!RingActivity.isShowing) {
+                wakeScreen()
+                launchRingScreen(alarm.id)
+                notifyAgain(alarm)
+            }
             handler.postDelayed(this, RE_RAISE_INTERVAL_MS)
         }
     }
@@ -54,7 +69,11 @@ class AlarmService : Service() {
             ACTION_RING -> startRinging(intent.getIntExtra(EXTRA_ALARM_ID, -1))
             ACTION_SNOOZE -> handleSnooze()
             ACTION_DISMISS -> handleDismiss()
-            else -> stopEverything()
+            ACTION_DUCK -> {
+                val p = player
+                if (p == null || currentAlarm == null) stopSelf() else p.setDucked(intent.getBooleanExtra(EXTRA_DUCKED, false))
+            }
+            else -> if (currentAlarm == null) stopEverything()
         }
         return START_NOT_STICKY
     }
@@ -67,12 +86,13 @@ class AlarmService : Service() {
             return
         }
 
-        // Must happen within a few seconds of the service starting.
-        startForegroundCompat(alarm)
+        if (currentAlarm?.id == alarm.id && player != null) {
+            // Already ringing for this alarm; just make sure it is on screen.
+            launchRingScreen(alarm.id)
+            return
+        }
 
-        if (currentAlarm?.id == alarm.id && player != null) return // already ringing
-
-        // A different alarm arriving mid-ring: silence the old one first.
+        // A different alarm arriving mid-ring takes over from the first.
         player?.stop()
         player = null
 
@@ -80,26 +100,47 @@ class AlarmService : Service() {
         _ringingAlarmId.value = alarm.id
         _ringingSince.value = System.currentTimeMillis()
 
-        acquireWakeLock(alarm)
+        // Must happen within a few seconds of the service starting.
+        startForegroundCompat(alarm)
+
+        acquireCpuLock(alarm)
+        wakeScreen()
         player = AlarmPlayer(this).also { it.start(alarm) }
+        launchRingScreen(alarm.id)
 
         handler.removeCallbacks(autoSilenceTask)
         if (alarm.autoSilenceMinutes > 0) {
             handler.postDelayed(autoSilenceTask, alarm.autoSilenceMinutes * 60_000L)
         }
         handler.removeCallbacks(reRaiseTask)
-        handler.postDelayed(reRaiseTask, RE_RAISE_INTERVAL_MS)
-
-        launchRingScreen(alarm.id)
+        handler.postDelayed(reRaiseTask, FIRST_RE_RAISE_MS)
     }
 
     private fun launchRingScreen(alarmId: Int) {
-        // The full screen intent on the notification is the reliable path; this direct
-        // start is a bonus for when the screen is already on and the app is allowed it.
         try {
             startActivity(ringIntent(this, alarmId))
         } catch (t: Throwable) {
-            Log.w(TAG, "Could not start the ring screen directly", t)
+            // Blocked as a background activity start. The full screen intent
+            // and the heads-up notification are still on their way.
+            Log.w(TAG, "Direct start of the ring screen was refused", t)
+        }
+    }
+
+    /**
+     * Physically switches the screen on. The flag is deprecated in favour of the
+     * activity's turnScreenOn, but several phone makers only honour this one when
+     * the activity is started from the background.
+     */
+    @Suppress("DEPRECATION")
+    private fun wakeScreen() {
+        runCatching {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK or
+                    PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                    PowerManager.ON_AFTER_RELEASE,
+                "jaago:screen"
+            ).acquire(SCREEN_WAKE_MS)
         }
     }
 
@@ -121,6 +162,7 @@ class AlarmService : Service() {
         if (alarm != null) {
             AlarmStore.resetSnoozes(alarm.id)
             logEvent(alarm, "Woke up")
+            if (alarm.isQuick) AlarmStore.delete(alarm.id)
         }
         stopEverything()
     }
@@ -130,6 +172,7 @@ class AlarmService : Service() {
         AlarmStore.resetSnoozes(alarm.id)
         logEvent(alarm, "Missed, silenced automatically")
         postMissedNotice(alarm)
+        if (alarm.isQuick) AlarmStore.delete(alarm.id)
         stopEverything()
     }
 
@@ -139,7 +182,7 @@ class AlarmService : Service() {
         AlarmStore.logEvent(
             WakeEvent(
                 atMillis = if (started > 0) started else System.currentTimeMillis(),
-                label = alarm.label.ifBlank { alarm.timeText() },
+                label = alarm.label.ifBlank { alarm.clockFull(is24()) },
                 outcome = outcome,
                 secondsTaken = seconds
             )
@@ -154,7 +197,7 @@ class AlarmService : Service() {
         currentAlarm = null
         _ringingAlarmId.value = null
         _ringingSince.value = 0L
-        releaseWakeLock()
+        releaseCpuLock()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -166,11 +209,13 @@ class AlarmService : Service() {
         player = null
         _ringingAlarmId.value = null
         _ringingSince.value = 0L
-        releaseWakeLock()
+        releaseCpuLock()
         super.onDestroy()
     }
 
-    // --- notification ---------------------------------------------------------
+    private fun is24(): Boolean = runCatching { DateFormat.is24HourFormat(this) }.getOrDefault(false)
+
+    // --- notification -------------------------------------------------------
 
     private fun startForegroundCompat(alarm: Alarm) {
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -185,7 +230,7 @@ class AlarmService : Service() {
         }
     }
 
-    private fun notify(alarm: Alarm) {
+    private fun notifyAgain(alarm: Alarm) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         try {
             nm.notify(AlarmNotifications.NOTIF_RING, buildNotification(alarm))
@@ -195,21 +240,22 @@ class AlarmService : Service() {
     }
 
     private fun buildNotification(alarm: Alarm): Notification {
-        val fullScreen = PendingIntent.getActivity(
+        val openChallenges = PendingIntent.getActivity(
             this,
             9000 + alarm.id,
             ringIntent(this, alarm.id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = alarm.label.ifBlank { "Alarm" } + "  " + alarm.timeText()
+        val time = alarm.clockFull(is24())
+        val title = if (alarm.label.isBlank()) "Alarm  $time" else "$time  ${alarm.label}"
         val text = if (alarm.challenges.isEmpty()) {
             "Tap to stop the alarm"
         } else {
-            alarm.challenges.joinToString(", ") { it.describe() }
+            "Tap to solve: " + alarm.challenges.joinToString("  then  ") { it.describe() }
         }
 
-        val builder = NotificationCompat.Builder(this, AlarmNotifications.CHANNEL_RING)
+        val builder = NotificationCompat.Builder(this, AlarmNotifications.CHANNEL_ALARM)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(title)
             .setContentText(text)
@@ -217,24 +263,26 @@ class AlarmService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(0xFFFF4D6D.toInt())
             .setOngoing(true)
             .setAutoCancel(false)
-            .setSilent(true)
-            .setContentIntent(fullScreen)
-            .setFullScreenIntent(fullScreen, true)
+            .setOnlyAlertOnce(false)
+            .setShowWhen(true)
+            .setWhen(_ringingSince.value.takeIf { it > 0 } ?: System.currentTimeMillis())
+            .setUsesChronometer(true)
+            .setContentIntent(openChallenges)
+            .setFullScreenIntent(openChallenges, true)
 
+        if (alarm.challenges.isEmpty()) {
+            builder.addAction(0, "Stop", servicePendingIntent(this, ACTION_DISMISS, alarm.id, 7200))
+        } else {
+            builder.addAction(0, "Solve to stop", openChallenges)
+        }
         if (alarm.snoozeEnabled && AlarmStore.snoozesUsed(alarm.id) < alarm.maxSnoozes) {
             builder.addAction(
                 0,
                 "Snooze ${alarm.snoozeMinutes} min",
                 servicePendingIntent(this, ACTION_SNOOZE, alarm.id, 7100)
-            )
-        }
-        if (alarm.challenges.isEmpty()) {
-            builder.addAction(
-                0,
-                "Stop",
-                servicePendingIntent(this, ACTION_DISMISS, alarm.id, 7200)
             )
         }
         return builder.build()
@@ -244,46 +292,53 @@ class AlarmService : Service() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notice = NotificationCompat.Builder(this, AlarmNotifications.CHANNEL_INFO)
             .setSmallIcon(R.drawable.ic_stat_alarm)
-            .setContentTitle("Missed alarm: ${alarm.timeText()}")
+            .setContentTitle("Missed alarm: ${alarm.clockFull(is24())}")
             .setContentText("It rang for ${alarm.autoSilenceMinutes} minutes and nobody solved it.")
             .setAutoCancel(true)
             .build()
         runCatching { nm.notify(AlarmNotifications.NOTIF_MISSED, notice) }
     }
 
-    // --- wake lock ------------------------------------------------------------
+    // --- CPU wake lock -------------------------------------------------------
 
-    private fun acquireWakeLock(alarm: Alarm) {
-        releaseWakeLock()
+    private fun acquireCpuLock(alarm: Alarm) {
+        releaseCpuLock()
         val minutes = if (alarm.autoSilenceMinutes > 0) alarm.autoSilenceMinutes else 20
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jaago:ringing").apply {
+        cpuLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "jaago:ringing").apply {
             setReferenceCounted(false)
             runCatching { acquire(minutes * 60_000L + 60_000L) }
         }
     }
 
-    private fun releaseWakeLock() {
-        wakeLock?.let { lock -> runCatching { if (lock.isHeld) lock.release() } }
-        wakeLock = null
+    private fun releaseCpuLock() {
+        cpuLock?.let { lock -> runCatching { if (lock.isHeld) lock.release() } }
+        cpuLock = null
     }
 
     companion object {
         private const val TAG = "JaagoService"
-        private const val RE_RAISE_INTERVAL_MS = 15_000L
+        private const val FIRST_RE_RAISE_MS = 2_500L
+        private const val RE_RAISE_INTERVAL_MS = 6_000L
+        private const val SCREEN_WAKE_MS = 12_000L
 
         const val ACTION_RING = "com.amrit.jaago.action.RING"
         const val ACTION_SNOOZE = "com.amrit.jaago.action.SNOOZE"
         const val ACTION_DISMISS = "com.amrit.jaago.action.DISMISS"
+        const val ACTION_DUCK = "com.amrit.jaago.action.DUCK"
         const val EXTRA_ALARM_ID = "com.amrit.jaago.extra.ALARM_ID"
+        const val EXTRA_DUCKED = "com.amrit.jaago.extra.DUCKED"
 
         private val _ringingAlarmId = MutableStateFlow<Int?>(null)
 
-        /** The alarm that is making noise right now, if any. */
+        /** The alarm making noise right now, if any. */
         val ringingAlarmId: StateFlow<Int?> = _ringingAlarmId.asStateFlow()
 
         private val _ringingSince = MutableStateFlow(0L)
         val ringingSince: StateFlow<Long> = _ringingSince.asStateFlow()
+
+        /** True when Android will let the service open the alarm screen by itself. */
+        fun canPopUp(context: Context): Boolean = Settings.canDrawOverlays(context)
 
         fun ringIntent(context: Context, alarmId: Int): Intent =
             Intent(context, RingActivity::class.java).apply {
@@ -328,6 +383,14 @@ class AlarmService : Service() {
 
         fun snooze(context: Context) {
             val intent = Intent(context, AlarmService::class.java).apply { action = ACTION_SNOOZE }
+            runCatching { context.startService(intent) }
+        }
+
+        fun setDucked(context: Context, ducked: Boolean) {
+            val intent = Intent(context, AlarmService::class.java).apply {
+                action = ACTION_DUCK
+                putExtra(EXTRA_DUCKED, ducked)
+            }
             runCatching { context.startService(intent) }
         }
     }

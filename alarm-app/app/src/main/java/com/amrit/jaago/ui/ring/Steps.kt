@@ -89,6 +89,7 @@ fun MathStep(
     count: Int,
     heading: String,
     accent: Color,
+    onInteract: () -> Unit,
     onSolved: () -> Unit
 ) {
     var solved by remember(difficulty, count) { mutableStateOf(0) }
@@ -190,13 +191,20 @@ fun MathStep(
             enabled = lockSeconds == 0,
             accent = accent,
             onDigit = { digit ->
+                onInteract()
                 if (input.length < 9) {
                     input += digit
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 }
             },
-            onClear = { input = "" },
-            onSubmit = { submit() },
+            onClear = {
+                onInteract()
+                input = ""
+            },
+            onSubmit = {
+                onInteract()
+                submit()
+            },
             modifier = Modifier.weight(1f)
         )
     }
@@ -315,6 +323,7 @@ fun TypingStep(
     strictCase: Boolean,
     heading: String,
     accent: Color,
+    onInteract: () -> Unit,
     onSolved: () -> Unit
 ) {
     var done by remember(difficulty, count) { mutableStateOf(0) }
@@ -404,7 +413,10 @@ fun TypingStep(
         CompositionLocalProvider(LocalTextToolbar provides NoClipboardToolbar) {
             OutlinedTextField(
                 value = input,
-                onValueChange = { input = it },
+                onValueChange = {
+                    onInteract()
+                    input = it
+                },
                 label = { Text("Type it here") },
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
@@ -465,6 +477,7 @@ private fun ThinProgress(progress: Float, accent: Color) {
 @Composable
 fun BarcodeStep(
     spec: ChallengeSpec.Barcode,
+    onInteract: () -> Unit,
     onSolved: () -> Unit,
     onEscape: () -> Unit
 ) {
@@ -505,6 +518,7 @@ fun BarcodeStep(
         ) {
             WithCameraPermission {
                 BarcodeScannerView(modifier = Modifier.fillMaxSize()) { value, _ ->
+                    onInteract()
                     if (value == spec.value) {
                         if (!alreadySolved) {
                             alreadySolved = true
@@ -565,79 +579,6 @@ fun BarcodeStep(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// No challenge: hold the button
-// ---------------------------------------------------------------------------
-
-@Composable
-fun HoldToStopStep(onSolved: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    var held by remember { mutableStateOf(0f) }
-    val accent = com.amrit.jaago.ui.theme.Alarm1
-
-    LaunchedEffect(pressed) {
-        if (pressed) {
-            while (held < 1f) {
-                delay(40)
-                held = (held + 0.022f).coerceAtMost(1f)
-            }
-            onSolved()
-        } else {
-            held = 0f
-        }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .width(210.dp)
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null
-                ) { },
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val stroke = size.minDimension * 0.065f
-                drawCircle(
-                    color = Slate2,
-                    radius = (size.minDimension - stroke) / 2f,
-                    style = Stroke(width = stroke)
-                )
-                drawArc(
-                    color = accent,
-                    startAngle = -90f,
-                    sweepAngle = 360f * held,
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                    topLeft = Offset(stroke / 2f, stroke / 2f),
-                    size = androidx.compose.ui.geometry.Size(
-                        size.width - stroke,
-                        size.height - stroke
-                    )
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Hold", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TextHi)
-                Text("to stop", fontSize = 14.sp, color = TextMid)
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text(
-            "No challenge is set on this alarm.",
-            fontSize = 12.5.sp,
-            color = TextLo
-        )
     }
 }
 

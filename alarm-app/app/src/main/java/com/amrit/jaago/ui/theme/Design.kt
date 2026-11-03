@@ -23,11 +23,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -450,50 +453,143 @@ fun StatPill(text: String, color: Color, modifier: Modifier = Modifier) {
 }
 
 // ---------------------------------------------------------------------------
-// Bottom navigation: a floating pill, not a slab
+// Bottom navigation
 // ---------------------------------------------------------------------------
 
 enum class HomeTab(val title: String, val iconRes: Int) {
-    ALARMS("Alarms", com.amrit.jaago.R.drawable.ic_alarm),
-    LOG("Log", com.amrit.jaago.R.drawable.ic_log),
-    SETUP("Setup", com.amrit.jaago.R.drawable.ic_tune)
+    ALARMS("Alarm", com.amrit.jaago.R.drawable.ic_alarm),
+    LOG("Report", com.amrit.jaago.R.drawable.ic_log),
+    SETUP("Settings", com.amrit.jaago.R.drawable.ic_tune)
 }
 
 @Composable
-fun BottomNavPill(current: HomeTab, onSelect: (HomeTab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(22.dp)
-    Row(
-        modifier = modifier
-            .clip(shape)
-            .background(Slate.copy(alpha = 0.97f), shape)
-            .border(1.dp, Hairline, shape)
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        HomeTab.values().forEach { tab ->
-            val selected = tab == current
-            val bg by animateColorAsState(if (selected) Alarm1.copy(alpha = 0.18f) else Color.Transparent)
-            val fg by animateColorAsState(if (selected) Alarm1 else TextLo)
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(17.dp))
-                    .background(bg, RoundedCornerShape(17.dp))
-                    .clickable { onSelect(tab) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                Icon(
-                    painter = painterResource(id = tab.iconRes),
-                    contentDescription = tab.title,
-                    tint = fg,
-                    modifier = Modifier.size(19.dp)
-                )
-                if (selected) {
-                    Text(tab.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = fg)
+fun BottomNavBar(current: HomeTab, onSelect: (HomeTab) -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.fillMaxWidth().background(Slate)) {
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Hairline))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            HomeTab.values().forEach { tab ->
+                val selected = tab == current
+                val fg by animateColorAsState(if (selected) TextHi else TextLo)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onSelect(tab) }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = tab.iconRes),
+                        contentDescription = tab.title,
+                        tint = fg,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        tab.title,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = fg
+                    )
                 }
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bottom sheet: built from stable parts so it behaves the same on every version
+// ---------------------------------------------------------------------------
+
+@Composable
+fun BottomSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    title: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    androidx.activity.compose.BackHandler(enabled = visible) { onDismiss() }
+    Box(modifier = Modifier.fillMaxSize()) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = visible,
+            enter = androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onDismiss() }
+            )
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = visible,
+            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) +
+                androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) +
+                androidx.compose.animation.fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 680.dp)
+                    .clip(shape)
+                    .background(Slate, shape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { }
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .size(width = 40.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(Hairline, CircleShape)
+                )
+                if (title != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            title,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextHi,
+                            modifier = Modifier.weight(1f)
+                        )
+                        CloseButton(onClick = onDismiss)
+                    }
+                }
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+fun CloseButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(Slate2, CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(14.dp)) {
+            val w = size.minDimension * 0.14f
+            drawLine(TextHi, Offset(0f, 0f), Offset(size.width, size.height), w, androidx.compose.ui.graphics.StrokeCap.Round)
+            drawLine(TextHi, Offset(size.width, 0f), Offset(0f, size.height), w, androidx.compose.ui.graphics.StrokeCap.Round)
         }
     }
 }
@@ -510,7 +606,7 @@ fun DayDots(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        com.amrit.jaago.model.Alarm.DAY_ORDER.forEach { day ->
+        com.amrit.jaago.model.Alarm.DISPLAY_ORDER.forEach { day ->
             val on = days.contains(day)
             val bg by animateColorAsState(if (on) accent else Slate2)
             val fg by animateColorAsState(if (on) Color(0xFF14060A) else TextMid)

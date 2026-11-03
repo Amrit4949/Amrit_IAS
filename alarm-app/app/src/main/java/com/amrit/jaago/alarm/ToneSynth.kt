@@ -17,7 +17,7 @@ import kotlin.math.PI
  *
  * Phase is accumulated per sample, so frequency sweeps stay clean with no clicks.
  */
-class ToneSynth(private val profile: SoundProfile) {
+class ToneSynth(private val profile: SoundProfile, private val drive: Double = 1.0) {
 
     private var sampleIndex: Long = 0
     private var phase1 = 0.0
@@ -36,7 +36,7 @@ class ToneSynth(private val profile: SoundProfile) {
                 SoundProfile.AIRHORN -> airhorn(t)
                 SoundProfile.SYSTEM -> screech(t) // never used, the player picks MediaPlayer
             }
-            val shaped = clip(value) * rampGain(t) * PEAK
+            val shaped = clip(value * drive) * rampGain(t) * PEAK
             out[i] = shaped.toInt().toShort()
             sampleIndex++
         }

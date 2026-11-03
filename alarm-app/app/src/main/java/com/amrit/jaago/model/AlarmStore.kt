@@ -83,7 +83,7 @@ object AlarmStore {
 
     fun delete(id: Int) {
         writeAlarms(_alarms.value.filterNot { it.id == id })
-        prefs.edit().remove(SNOOZE_PREFIX + id).apply()
+        prefs.edit().remove(SNOOZE_PREFIX + id).remove(OVERRIDE_PREFIX + id).apply()
     }
 
     fun newId(): Int {
@@ -103,6 +103,39 @@ object AlarmStore {
     fun resetSnoozes(alarmId: Int) {
         prefs.edit().remove(SNOOZE_PREFIX + alarmId).apply()
     }
+
+    // ----- one-off firing times (snooze, "test in 1 minute") -----
+    //
+    // A snooze or a test re-arms the alarm's own PendingIntent at an unusual time.
+    // If the process restarts before it fires, rescheduleAll() must put back that
+    // time, not the alarm's regular one, or the snooze is silently lost.
+
+    private const val OVERRIDE_PREFIX = "override_at_"
+
+    fun overrideAt(alarmId: Int): Long = prefs.getLong(OVERRIDE_PREFIX + alarmId, 0L)
+
+    fun setOverride(alarmId: Int, at: Long) {
+        prefs.edit().putLong(OVERRIDE_PREFIX + alarmId, at).apply()
+    }
+
+    fun clearOverride(alarmId: Int) {
+        prefs.edit().remove(OVERRIDE_PREFIX + alarmId).apply()
+    }
+
+    // ----- setup gate -----
+
+    var setupDismissed: Boolean
+        get() = isReady && prefs.getBoolean("setup_dismissed", false)
+        set(value) {
+            if (isReady) prefs.edit().putBoolean("setup_dismissed", value).apply()
+        }
+
+    /** The manufacturer auto-start screen cannot be read back, so the user ticks it. */
+    var oemStepConfirmed: Boolean
+        get() = isReady && prefs.getBoolean("oem_step_confirmed", false)
+        set(value) {
+            if (isReady) prefs.edit().putBoolean("oem_step_confirmed", value).apply()
+        }
 
     // ----- wake-up log -----
 

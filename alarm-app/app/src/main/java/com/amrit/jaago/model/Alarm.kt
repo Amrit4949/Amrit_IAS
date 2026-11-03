@@ -72,6 +72,13 @@ sealed class ChallengeSpec {
         companion object { const val TYPE = "typing" }
     }
 
+    /** Two or three words for a mission slot tile. */
+    fun shortLabel(): String = when (this) {
+        is Barcode -> if (label.isBlank()) "Scan" else label.take(14)
+        is Maths -> "$count x ${difficulty.title}"
+        is Typing -> (if (count > 1) "$count x " else "") + difficulty.title
+    }
+
     fun describe(): String = when (this) {
         is Barcode -> if (label.isBlank()) "Scan the saved code" else "Scan: $label"
         is Maths -> "$count ${difficulty.title.lowercase()} maths question" + (if (count == 1) "" else "s")
@@ -89,7 +96,12 @@ data class Alarm(
     val days: Set<Int> = emptySet(),
     val sound: SoundProfile = SoundProfile.SCREECH,
     val vibrate: Boolean = true,
-    val forceMaxVolume: Boolean = true,
+    /** Alarm stream volume while ringing, as a percentage of the phone's maximum. */
+    val volumePercent: Int = 100,
+    /** Drives the synthesised tone harder into clipping, which sounds louder. */
+    val extraLoud: Boolean = true,
+    /** Created from the Quick alarm sheet; deleted once it has rung. */
+    val isQuick: Boolean = false,
     val snoozeMinutes: Int = 0,
     val maxSnoozes: Int = 2,
     val challenges: List<ChallengeSpec> = emptyList(),
@@ -100,6 +112,17 @@ data class Alarm(
 
     fun timeText(): String = String.format("%02d:%02d", hour, minute)
 
+    /** "5:30" in 12 hour mode, "05:30" in 24 hour mode. */
+    fun clockMain(is24: Boolean): String =
+        if (is24) String.format("%02d:%02d", hour, minute)
+        else String.format("%d:%02d", if (hour % 12 == 0) 12 else hour % 12, minute)
+
+    /** "am" / "pm", or empty in 24 hour mode. */
+    fun clockSuffix(is24: Boolean): String = if (is24) "" else if (hour < 12) "am" else "pm"
+
+    fun clockFull(is24: Boolean): String =
+        clockMain(is24) + clockSuffix(is24).let { if (it.isEmpty()) "" else " $it" }
+
     fun daysText(): String {
         if (days.isEmpty()) return "Once"
         if (days.size == 7) return "Every day"
@@ -109,6 +132,14 @@ data class Alarm(
     }
 
     companion object {
+        const val MAX_MISSIONS = 5
+
+        /** Sunday first, the way the week is laid out on screen. */
+        val DISPLAY_ORDER = listOf(
+            Calendar.SUNDAY, Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY,
+            Calendar.THURSDAY, Calendar.FRIDAY, Calendar.SATURDAY
+        )
+
         val DAY_ORDER = listOf(
             Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.THURSDAY,
             Calendar.FRIDAY, Calendar.SATURDAY, Calendar.SUNDAY
@@ -164,7 +195,9 @@ object AlarmJson {
         o.put("days", JSONArray().also { arr -> a.days.sorted().forEach { arr.put(it) } })
         o.put("sound", a.sound.id)
         o.put("vibrate", a.vibrate)
-        o.put("forceMaxVolume", a.forceMaxVolume)
+        o.put("volumePercent", a.volumePercent)
+        o.put("extraLoud", a.extraLoud)
+        o.put("isQuick", a.isQuick)
         o.put("snoozeMinutes", a.snoozeMinutes)
         o.put("maxSnoozes", a.maxSnoozes)
         o.put("autoSilenceMinutes", a.autoSilenceMinutes)
@@ -195,7 +228,9 @@ object AlarmJson {
             days = days,
             sound = SoundProfile.from(o.optString("sound")),
             vibrate = o.optBoolean("vibrate", true),
-            forceMaxVolume = o.optBoolean("forceMaxVolume", true),
+            volumePercent = o.optInt("volumePercent", 100).coerceIn(10, 100),
+            extraLoud = o.optBoolean("extraLoud", true),
+            isQuick = o.optBoolean("isQuick", false),
             snoozeMinutes = o.optInt("snoozeMinutes", 0),
             maxSnoozes = o.optInt("maxSnoozes", 2),
             challenges = challenges,

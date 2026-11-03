@@ -29,16 +29,32 @@ class AlarmPlayer(private val context: Context) {
     @Volatile private var running = false
 
     private var previousAlarmVolume: Int? = null
+    @Volatile private var level = 1f
 
-    fun start(profile: SoundProfile, forceMaxVolume: Boolean, vibrate: Boolean) {
+    /**
+     * [volumePercent] sets the alarm stream for the duration of the ring and is
+     * restored afterwards; null leaves the phone's volume alone (used by previews).
+     */
+    fun start(profile: SoundProfile, volumePercent: Int?, vibrate: Boolean, extraLoud: Boolean) {
         stop()
         running = true
-        if (forceMaxVolume) raiseAlarmVolume()
-        if (profile == SoundProfile.SYSTEM) startRingtone() else startSynth(profile)
+        level = 1f
+        if (volumePercent != null) setAlarmVolume(volumePercent)
+        if (profile == SoundProfile.SYSTEM) startRingtone() else startSynth(profile, extraLoud)
         if (vibrate) startVibration()
     }
 
-    fun start(alarm: Alarm) = start(alarm.sound, alarm.forceMaxVolume, alarm.vibrate)
+    fun start(alarm: Alarm) = start(alarm.sound, alarm.volumePercent, alarm.vibrate, alarm.extraLoud)
+
+    /**
+     * Turns the noise down while a mission is being worked on, so you can think,
+     * and back up the moment you stop. The vibration carries on regardless.
+     */
+    fun setDucked(ducked: Boolean) {
+        level = if (ducked) DUCK_LEVEL else 1f
+        runCatching { track?.setVolume(level) }
+        runCatching { mediaPlayer?.setVolume(level, level) }
+    }
 
     fun stop() {
         running = false
@@ -66,7 +82,7 @@ class AlarmPlayer(private val context: Context) {
 
     // --- generated tone -------------------------------------------------------
 
-    private fun startSynth(profile: SoundProfile) {
+    private fun startSynth(profile: SoundProfile, extraLoud: Boolean) {
         val minBuffer = AudioTrack.getMinBufferSize(
             ToneSynth.SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -98,10 +114,10 @@ class AlarmPlayer(private val context: Context) {
         }
 
         track = audioTrack
-        runCatching { audioTrack.setVolume(AudioTrack.getMaxVolume()) }
+        runCatching { audioTrack.setVolume(level) }
         audioTrack.play()
 
-        val synth = ToneSynth(profile)
+        val synth = ToneSynth(profile, drive = if (extraLoud) 1.7 else 1.0)
         val chunk = ShortArray(2048)
         val thread = Thread({
             while (running) {
@@ -140,6 +156,7 @@ class AlarmPlayer(private val context: Context) {
                 setDataSource(context, uri)
                 isLooping = true
                 prepare()
+                setVolume(level, level)
                 start()
             }
         } catch (t: Throwable) {
@@ -152,16 +169,17 @@ class AlarmPlayer(private val context: Context) {
     private fun audioManager(): AudioManager =
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    private fun raiseAlarmVolume() {
+    private fun setAlarmVolume(percent: Int) {
         try {
             val am = audioManager()
             val max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val target = ((max * percent.coerceIn(10, 100)) / 100f).toInt().coerceIn(1, max)
             previousAlarmVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
-            if (previousAlarmVolume != max) {
-                am.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
+            if (previousAlarmVolume != target) {
+                am.setStreamVolume(AudioManager.STREAM_ALARM, target, 0)
             }
         } catch (t: Throwable) {
-            Log.w(TAG, "Could not force the alarm volume to maximum", t)
+            Log.w(TAG, "Could not set the alarm volume", t)
         }
     }
 
@@ -212,5 +230,6 @@ class AlarmPlayer(private val context: Context) {
 
     companion object {
         private const val TAG = "JaagoPlayer"
+        private const val DUCK_LEVEL = 0.22f
     }
 }

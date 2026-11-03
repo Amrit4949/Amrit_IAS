@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import com.amrit.jaago.MainActivity
 import com.amrit.jaago.model.Alarm
@@ -14,17 +15,27 @@ object AlarmScheduler {
 
     const val EXTRA_ALARM_ID = "com.amrit.jaago.ALARM_ID"
     const val EXTRA_SNOOZED = "com.amrit.jaago.SNOOZED"
+    const val EXTRA_TEST = "com.amrit.jaago.TEST"
 
     private fun manager(context: Context): AlarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    private fun firePendingIntent(context: Context, alarmId: Int, snoozed: Boolean): PendingIntent {
+    /**
+     * One PendingIntent per alarm. Snooze and test reuse it, so re-arming always
+     * replaces whatever was pending rather than stacking a second trigger.
+     */
+    private fun firePendingIntent(
+        context: Context,
+        alarmId: Int,
+        snoozed: Boolean,
+        test: Boolean
+    ): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = "com.amrit.jaago.FIRE"
             putExtra(EXTRA_ALARM_ID, alarmId)
             putExtra(EXTRA_SNOOZED, snoozed)
-            // Keeps the PendingIntent unique per alarm even though extras are ignored for equality.
-            data = android.net.Uri.parse("jaago://alarm/$alarmId")
+            putExtra(EXTRA_TEST, test)
+            data = Uri.parse("jaago://alarm/$alarmId")
         }
         return PendingIntent.getBroadcast(
             context,
@@ -44,7 +55,6 @@ object AlarmScheduler {
         )
     }
 
-    /** True when the system lets us fire on an exact minute. */
     fun canScheduleExact(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             manager(context).canScheduleExactAlarms()
@@ -52,7 +62,7 @@ object AlarmScheduler {
             true
         }
 
-    /** The next moment this alarm should go off, in wall clock millis. */
+    /** The next moment this alarm should go off by its own schedule. */
     fun nextTrigger(alarm: Alarm, from: Long = System.currentTimeMillis()): Long {
         val base = Calendar.getInstance().apply {
             timeInMillis = from
@@ -74,33 +84,65 @@ object AlarmScheduler {
                 return candidate.timeInMillis
             }
         }
-        // Should not happen, but never return something in the past.
         base.add(Calendar.DAY_OF_YEAR, 1)
         return base.timeInMillis
     }
 
+    /** When this alarm will actually ring next: a pending snooze or test wins. */
+    fun effectiveNext(alarm: Alarm, from: Long = System.currentTimeMillis()): Long? {
+        val override = AlarmStore.overrideAt(alarm.id)
+        if (override > from) return override
+        return if (alarm.enabled) nextTrigger(alarm, from) else null
+    }
+
+    /**
+     * Arms the alarm. A snooze or test that is still pending is kept, so editing
+     * an alarm, rebooting, or the process restarting never throws one away.
+     */
     fun schedule(context: Context, alarm: Alarm): Long {
-        cancel(context, alarm.id)
-        if (!alarm.enabled) return 0L
-        val at = nextTrigger(alarm)
-        armAt(context, alarm.id, at, snoozed = false)
+        val now = System.currentTimeMillis()
+        if (!alarm.enabled) {
+            cancel(context, alarm.id)
+            AlarmStore.clearOverride(alarm.id)
+            return 0L
+        }
+        val override = AlarmStore.overrideAt(alarm.id)
+        if (override > now) {
+            armAt(context, alarm.id, override, snoozed = true, test = false)
+            return override
+        }
+        AlarmStore.clearOverride(alarm.id)
+        val at = nextTrigger(alarm, now)
+        armAt(context, alarm.id, at, snoozed = false, test = false)
         return at
     }
 
     fun scheduleSnooze(context: Context, alarm: Alarm, minutes: Int): Long {
-        cancel(context, alarm.id)
         val at = System.currentTimeMillis() + minutes * 60_000L
-        armAt(context, alarm.id, at, snoozed = true)
+        AlarmStore.setOverride(alarm.id, at)
+        armAt(context, alarm.id, at, snoozed = true, test = false)
         return at
     }
 
-    private fun armAt(context: Context, alarmId: Int, at: Long, snoozed: Boolean) {
+    /**
+     * Rings this alarm for real after [delayMs], through AlarmManager and the
+     * receiver, exactly like a scheduled morning. The only honest way to check
+     * that it will appear on a locked screen.
+     */
+    fun scheduleTest(context: Context, alarm: Alarm, delayMs: Long = 60_000L): Long {
+        val at = System.currentTimeMillis() + delayMs
+        AlarmStore.setOverride(alarm.id, at)
+        armAt(context, alarm.id, at, snoozed = true, test = true)
+        return at
+    }
+
+    private fun armAt(context: Context, alarmId: Int, at: Long, snoozed: Boolean, test: Boolean) {
         val am = manager(context)
-        val operation = firePendingIntent(context, alarmId, snoozed)
+        val operation = firePendingIntent(context, alarmId, snoozed, test)
         try {
             if (canScheduleExact(context)) {
-                // setAlarmClock survives Doze, shows the system alarm icon, and gets the
-                // app a short allow-list window so the service can start.
+                // Survives Doze, shows the alarm icon, and gives the app a short
+                // allow-list window so the foreground service may start.
                 am.setAlarmClock(AlarmManager.AlarmClockInfo(at, showPendingIntent(context)), operation)
             } else {
                 am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, operation)
@@ -111,17 +153,26 @@ object AlarmScheduler {
     }
 
     fun cancel(context: Context, alarmId: Int) {
-        manager(context).cancel(firePendingIntent(context, alarmId, false))
+        manager(context).cancel(firePendingIntent(context, alarmId, snoozed = false, test = false))
     }
 
-    /** Re-arms every enabled alarm. Used after boot, after an update and on app start. */
+    /** Re-arms every alarm. Used after boot, an app update and clock changes. */
     fun rescheduleAll(context: Context) {
+        val now = System.currentTimeMillis()
         AlarmStore.all().forEach { alarm ->
-            if (alarm.enabled) schedule(context, alarm) else cancel(context, alarm.id)
+            val override = AlarmStore.overrideAt(alarm.id)
+            when {
+                override > now -> armAt(context, alarm.id, override, snoozed = true, test = false)
+                alarm.enabled -> schedule(context, alarm)
+                else -> {
+                    cancel(context, alarm.id)
+                    AlarmStore.clearOverride(alarm.id)
+                }
+            }
         }
     }
 
-    /** "in 7 h 20 m" style text for the alarm list. */
+    /** "in 7h 20m", compact, for small pills. */
     fun countdownText(at: Long, from: Long = System.currentTimeMillis()): String {
         var minutes = ((at - from).coerceAtLeast(0L) + 59_999L) / 60_000L
         val days = minutes / (24 * 60)
@@ -133,5 +184,21 @@ object AlarmScheduler {
             hours > 0 -> "in ${hours}h ${mins}m"
             else -> "in ${mins}m"
         }
+    }
+
+    /** "Rings in 22 hr 37 min", the way Alarmy phrases it. */
+    fun ringsInText(at: Long, from: Long = System.currentTimeMillis()): String {
+        val totalSeconds = ((at - from).coerceAtLeast(0L)) / 1000L
+        if (totalSeconds < 60) return "Rings in less than a minute"
+        var minutes = (totalSeconds + 59) / 60
+        val days = minutes / (24 * 60)
+        minutes %= (24 * 60)
+        val hours = minutes / 60
+        val mins = minutes % 60
+        val parts = mutableListOf<String>()
+        if (days > 0) parts.add(if (days == 1L) "1 day" else "$days days")
+        if (hours > 0) parts.add("$hours hr")
+        if (mins > 0 && days == 0L) parts.add("$mins min")
+        return "Rings in " + parts.joinToString(" ")
     }
 }

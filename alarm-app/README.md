@@ -45,28 +45,34 @@ It comes up to full level over 1.3 seconds rather than instantly, which protects
 speaker and your ears without giving you time to go back to sleep. "Force maximum
 volume" sets the alarm stream to full while it rings and puts it back afterwards.
 
-## Why it still rings when you fight it
+## How the alarm reaches your screen
 
-- Scheduled with `setAlarmClock`, which survives Doze and battery saving.
-- The sound is owned by a foreground service, so the alarm does not die when the
-  screen is off or the app is swiped away.
-- A full screen notification brings the alarm screen over the lock screen and
-  re-posts itself every 15 seconds while the challenge is unsolved.
-- The back button and the volume keys are swallowed by the alarm screen.
-- Every alarm is armed again after a reboot, an app update, or a clock change.
-- Android does not let any app block the home button. Leaving is therefore loud
-  rather than impossible.
-- After the give up timer (15 minutes by default) it silences itself and records a
-  missed alarm in the log.
+Android blocks apps from opening screens from the background, and phone makers
+add their own blocks on top. Jaago uses three routes at once and retries all of
+them every few seconds until the alarm screen is in front of you:
 
-## First run
+1. **Direct launch.** Allowed only when you grant *Display over other apps*. This
+   is what makes the alarm pop up by itself, locked or unlocked.
+2. **Full screen intent.** Android itself opens the alarm on a locked or sleeping
+   phone. Needs *Notifications* and, on Android 14+, *Full screen on the lock screen*.
+3. **Heads-up notification** with a *Solve to stop* button, for when the phone is
+   unlocked and in use.
 
-Open **Settings** in the app. Every line in the checklist has to say OK, otherwise
-Android is allowed to delay or mute your alarm. Each one has a button that takes you
-straight to the right system page.
+A wake lock switches the screen on, the alarm shows over the lock screen without
+unlocking it, and the back and volume keys are ignored. Snoozes and tests are
+stored, so a reboot or the app being killed never loses one.
 
-Then set an alarm and use **Try it now** on the list to feel exactly what 5 am will
-be like, while you are still awake enough to change your mind.
+On first launch a setup screen walks through each permission, with direct links
+into the settings of Xiaomi, OPPO/Realme/OnePlus, vivo/iQOO, Huawei and Samsung
+phones for their auto-start and pop-up switches. **Settings → Lock screen test**
+sets a real alarm one minute out so you can lock the phone and watch it work.
+
+## While it rings
+
+The ring screen opens on the time with **Dismiss** and **Snooze**. Dismiss starts
+the missions. While you are working on one the noise drops so you can think; leave
+it alone for 25 seconds (75 for a barcode, while you walk) and it comes back at
+full volume.
 
 ## Building locally
 
