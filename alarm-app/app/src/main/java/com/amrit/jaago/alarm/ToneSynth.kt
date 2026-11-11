@@ -17,7 +17,15 @@ import kotlin.math.PI
  *
  * Phase is accumulated per sample, so frequency sweeps stay clean with no clicks.
  */
-class ToneSynth(private val profile: SoundProfile, private val drive: Double = 1.0) {
+class ToneSynth(
+    private val profile: SoundProfile,
+    private val drive: Double = 1.0,
+    rampSeconds: Double = 0.0
+) {
+
+    /** Never below the short pop-guard ramp; longer when the alarm asks for a gentle start. */
+    private val ramp: Double = if (rampSeconds > MIN_RAMP_SECONDS) rampSeconds else MIN_RAMP_SECONDS
+    private val rampFloor: Double = if (rampSeconds > MIN_RAMP_SECONDS) 0.08 else 0.34
 
     private var sampleIndex: Long = 0
     private var phase1 = 0.0
@@ -48,7 +56,7 @@ class ToneSynth(private val profile: SoundProfile, private val drive: Double = 1
      * that you are awake before it finishes.
      */
     private fun rampGain(t: Double): Double =
-        if (t >= RAMP_SECONDS) 1.0 else 0.34 + 0.66 * (t / RAMP_SECONDS)
+        if (t >= ramp) 1.0 else rampFloor + (1.0 - rampFloor) * (t / ramp)
 
     // --- profiles -------------------------------------------------------------
 
@@ -115,6 +123,6 @@ class ToneSynth(private val profile: SoundProfile, private val drive: Double = 1
         const val SAMPLE_RATE = 44100
         private const val TWO_PI = 2.0 * PI
         private const val PEAK = 30000.0 // a little under Short.MAX_VALUE to avoid wrapping
-        private const val RAMP_SECONDS = 1.3
+        private const val MIN_RAMP_SECONDS = 1.3
     }
 }

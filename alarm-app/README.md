@@ -1,8 +1,12 @@
-# Jaago — an alarm clock you have to earn
+# Arise — an alarm clock you have to earn
 
 A standalone Android app (in this folder, independent of the VideoHub project at the
 repository root). It rings loudly and refuses to stop until you have done something
 that needs a working brain and, if you want, a walk to another room.
+
+Named for Vivekananda's line: *Arise, awake, and stop not till the goal is reached.*
+The app id is still `com.amrit.jaago`, so a build installs over the earlier "Jaago"
+versions as an update.
 
 ## How to get the APK
 
@@ -75,6 +79,27 @@ On first launch a setup screen walks through each permission, with direct links
 into the settings of Xiaomi, OPPO/Realme/OnePlus, vivo/iQOO, Huawei and Samsung
 phones for their auto-start and pop-up switches. **Settings → Lock screen test**
 sets a real alarm one minute out so you can lock the phone and watch it work.
+
+## Wallpapers
+
+Each alarm has a wallpaper: what fills the screen when it rings, and what the home
+screen hero sits on. The built in scenes are drawn live by the app, so nothing is
+downloaded or stored and every one of them moves:
+
+Dawn, Mesh, Ocean, Sakura, Ember, Aurora, Nebula, Midnight.
+
+**Auto** follows the hour (dawn tones early, cool by day, embers at night), and
+**Your photo** takes an image from the gallery, shrinks it and keeps a copy inside
+the app so it needs no lasting permission on the original.
+
+## Also on the home screen
+
+- a greeting by time of day, with your name if you add it in Settings
+- a quote of the day, and a fresh one on every alarm screen
+- your wake streak: consecutive days on which you beat the alarm
+- "Sleep by 10:30 pm for 7 hours" for the next alarm
+- **Gentle wake-up** per alarm: the sound climbs from quiet to full over 30 s to
+  5 min instead of starting at full blast
 
 ## While it rings
 

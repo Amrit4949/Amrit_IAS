@@ -199,7 +199,7 @@ object Perms {
                 Intent()
                     .setClassName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.SoftPermissionDetailActivity")
                     .putExtra("packagename", pkg)
-                    .putExtra("title", "Jaago"),
+                    .putExtra("title", "Arise"),
                 Intent()
                     .setClassName("com.iqoo.secure", "com.iqoo.secure.safecenter.ui.softpermission.SoftPermissionDetailActivity")
                     .putExtra("packagename", pkg)

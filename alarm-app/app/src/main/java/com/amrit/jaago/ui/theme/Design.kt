@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -89,6 +91,27 @@ fun GlassCard(
     )
 }
 
+/** A translucent panel for content laid over a wallpaper. */
+@Composable
+fun GlassPanel(
+    modifier: Modifier = Modifier,
+    padding: Dp = 18.dp,
+    alpha: Float = 0.72f,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Slate.copy(alpha = alpha), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .padding(padding),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content
+    )
+}
+
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, color: Color = TextLo) {
     Text(
@@ -110,7 +133,7 @@ fun ScreenHeader(
     trailing: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
+        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(start = 4.dp, end = 4.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) {
@@ -464,7 +487,7 @@ enum class HomeTab(val title: String, val iconRes: Int) {
 
 @Composable
 fun BottomNavBar(current: HomeTab, onSelect: (HomeTab) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxWidth().background(Slate)) {
+    Column(modifier = modifier.fillMaxWidth().background(Slate.copy(alpha = 0.96f)).navigationBarsPadding()) {
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Hairline))
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
@@ -548,6 +571,7 @@ fun BottomSheet(
                         indication = null
                     ) { }
                     .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
                     .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {

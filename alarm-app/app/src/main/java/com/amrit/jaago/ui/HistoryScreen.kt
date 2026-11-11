@@ -67,7 +67,7 @@ fun HistoryScreen() {
         PageBackground(glow = Good)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
@@ -119,6 +119,31 @@ fun HistoryScreen() {
                     }
                 }
             } else {
+                item {
+                    val streak = WakeStats.streak(history)
+                    val best = WakeStats.bestStreak(history)
+                    GlassCard(accent = Alarm1, lit = streak > 0) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    if (streak > 0) "$streak day streak" else "No streak yet",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextHi
+                                )
+                                Text(
+                                    if (streak > 0) "Days in a row you beat the alarm. Best so far: $best."
+                                    else "Beat tomorrow's alarm to start one.",
+                                    fontSize = 13.sp,
+                                    color = TextMid,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            IconBadge(iconRes = R.drawable.ic_bell, from = Alarm1, to = Alarm2, solid = streak > 0, boxSize = 52.dp)
+                        }
+                    }
+                }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         ScoreCard("Beaten", beaten.toString(), Good, Modifier.weight(1f))

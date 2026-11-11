@@ -3,13 +3,7 @@ package com.amrit.jaago.ui.ring
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,8 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -53,9 +47,15 @@ import com.amrit.jaago.model.AlarmStore
 import com.amrit.jaago.model.ChallengeSpec
 import com.amrit.jaago.model.MathDifficulty
 import com.amrit.jaago.model.TypingDifficulty
+import com.amrit.jaago.ui.Quotes
+import com.amrit.jaago.ui.WakeStats
+import com.amrit.jaago.ui.WallpaperView
+import com.amrit.jaago.ui.Wallpapers
 import com.amrit.jaago.ui.challengeGradient
 import com.amrit.jaago.ui.challengeLook
 import com.amrit.jaago.ui.theme.Alarm1
+import com.amrit.jaago.ui.theme.Alarm2
+import com.amrit.jaago.ui.theme.GlassPanel
 import com.amrit.jaago.ui.theme.BreathingGlow
 import com.amrit.jaago.ui.theme.Good
 import com.amrit.jaago.ui.theme.GradientButton
@@ -175,7 +175,12 @@ fun RingScreen(fallbackAlarmId: Int, onFinished: () -> Unit) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        RingBackdrop(accent = accent)
+        WallpaperView(
+            id = alarm.wallpaper,
+            animated = true,
+            dim = if (phase == Phase.LANDING) 0.30f else 0.58f,
+            modifier = Modifier.fillMaxSize()
+        )
 
         Crossfade(targetState = phase, modifier = Modifier.fillMaxSize()) { current ->
             when (current) {
@@ -202,7 +207,9 @@ fun RingScreen(fallbackAlarmId: Int, onFinished: () -> Unit) {
                 Phase.MISSIONS -> Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                        .statusBarsPadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     MissionTopBar(
@@ -214,7 +221,7 @@ fun RingScreen(fallbackAlarmId: Int, onFinished: () -> Unit) {
                         ducked = ducked
                     )
 
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    GlassPanel(modifier = Modifier.weight(1f), padding = 14.dp, alpha = 0.80f) {
                         Crossfade(
                             targetState = stepIndex to escapePhase,
                             modifier = Modifier.fillMaxSize()
@@ -290,22 +297,30 @@ private fun Landing(
 ) {
     val snoozesLeft = alarm.maxSnoozes - AlarmStore.snoozesUsed(alarm.id)
     val nowAlarm = Alarm(id = 0, hour = hourOf(nowMillis), minute = minuteOf(nowMillis))
+    val quote = remember { Quotes.random() }
+    val streak = remember { WakeStats.streak(AlarmStore.history.value) }
+    val accent = Wallpapers.accentOf(alarm.wallpaper)
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp, vertical = 24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(18.dp))
         Text(
             SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date(nowMillis)),
             fontSize = 16.sp,
-            color = TextMid
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White.copy(alpha = 0.85f)
         )
         Box(
             modifier = Modifier.fillMaxWidth().height(170.dp),
             contentAlignment = Alignment.Center
         ) {
-            BreathingGlow(color = Alarm1, modifier = Modifier.size(330.dp))
+            BreathingGlow(color = accent, modifier = Modifier.size(330.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     nowAlarm.clockMain(is24),
@@ -336,13 +351,32 @@ private fun Landing(
             Text(
                 "ringing for " + elapsedText(nowMillis - ringingSince),
                 fontSize = 13.sp,
-                color = Alarm1
+                color = accent
             )
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(18.dp))
+        GlassPanel(padding = 14.dp, alpha = 0.55f) {
+            Text(
+                "\u201c${quote.text}\u201d",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.92f),
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                quote.by + (if (streak > 0) "   ·   $streak day streak on the line" else ""),
+                fontSize = 11.5.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(Modifier.height(18.dp))
         if (alarm.challenges.isNotEmpty()) {
-            Text("To stop it", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextLo)
+            Text("To stop it", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f))
             Spacer(Modifier.height(10.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -376,6 +410,8 @@ private fun Landing(
         GradientButton(
             text = if (alarm.challenges.isEmpty()) "Dismiss" else "Dismiss: start mission",
             onClick = onDismiss,
+            from = accent,
+            to = Alarm2,
             height = 64.dp,
             modifier = Modifier.fillMaxWidth()
         )
@@ -413,7 +449,7 @@ private fun MissionTopBar(
     ducked: Boolean
 ) {
     val animatedIdle by animateFloatAsState(idleLeft)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    GlassPanel(padding = 12.dp, alpha = 0.70f) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 alarm.clockFull(is24),
@@ -448,35 +484,6 @@ private fun MissionTopBar(
                     .background(if (ducked) accent else Alarm1, CircleShape)
             )
         }
-    }
-}
-
-/** Dark wash that leans towards the current challenge's colour, with a slow sheen. */
-@Composable
-private fun RingBackdrop(accent: Color) {
-    val transition = rememberInfiniteTransition()
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(5200), RepeatMode.Reverse)
-    )
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        drawRect(color = Ink)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(accent.copy(alpha = 0.22f), accent.copy(alpha = 0.05f), Color.Transparent)
-            )
-        )
-        val c = Offset(size.width * (0.2f + 0.6f * drift), size.height * 0.85f)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(accent.copy(alpha = 0.10f), Color.Transparent),
-                center = c,
-                radius = size.width * 0.7f
-            ),
-            radius = size.width * 0.7f,
-            center = c
-        )
     }
 }
 

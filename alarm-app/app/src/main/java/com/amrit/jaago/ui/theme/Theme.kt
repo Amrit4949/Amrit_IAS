@@ -10,35 +10,35 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// --- surfaces -------------------------------------------------------------
+// --- surfaces: deep navy rather than flat grey ------------------------------
 
-val Ink = Color(0xFF07070C)          // page
-val Slate = Color(0xFF11131D)        // card
-val Slate2 = Color(0xFF191C28)       // raised, inputs
-val Hairline = Color(0xFF262A3A)     // 1dp borders
+val Ink = Color(0xFF080A16)          // page
+val Slate = Color(0xFF121528)        // card
+val Slate2 = Color(0xFF1A1E36)       // raised, inputs
+val Hairline = Color(0xFF272C48)     // 1dp borders
 
-val TextHi = Color(0xFFF3F4F9)
-val TextMid = Color(0xFFA6ABC0)
-val TextLo = Color(0xFF6A7085)
+val TextHi = Color(0xFFF4F5FA)
+val TextMid = Color(0xFFA9AEC6)
+val TextLo = Color(0xFF6C7290)
 
-// --- accents: one per thing you can do ------------------------------------
+// --- accents: sunrise for the alarm, one colour per mission -----------------
 
-val Alarm1 = Color(0xFFFF4D6D)
-val Alarm2 = Color(0xFFFF8A5B)
+val Alarm1 = Color(0xFFFF6B57)       // coral
+val Alarm2 = Color(0xFFFFB45A)       // amber
 
-val Scan1 = Color(0xFF35E0F0)
+val Scan1 = Color(0xFF3DE3F0)
 val Scan2 = Color(0xFF2B96FF)
 
-val Maths1 = Color(0xFFFFC247)
+val Maths1 = Color(0xFFFFC94A)
 val Maths2 = Color(0xFFFF8A3D)
 
-val Type1 = Color(0xFFA78BFA)
+val Type1 = Color(0xFFB08DFF)
 val Type2 = Color(0xFF7C5CFF)
 
 val Good = Color(0xFF3DDC97)
 val Bad = Color(0xFFFF5F6D)
 
-// Kept for the older call sites that referred to these by name.
+// Kept for older call sites.
 val Danger = Bad
 val Warn = Maths1
 val Cool = Scan1
@@ -52,9 +52,9 @@ fun accentWash(a: Color): Brush = Brush.verticalGradient(
 
 private val Scheme = darkColorScheme(
     primary = Alarm1,
-    onPrimary = Color(0xFF2A0008),
-    primaryContainer = Color(0xFF3D0C18),
-    onPrimaryContainer = Color(0xFFFFD9E0),
+    onPrimary = Color(0xFF2A0A05),
+    primaryContainer = Color(0xFF4A1A12),
+    onPrimaryContainer = Color(0xFFFFE0D6),
     secondary = Scan1,
     onSecondary = Color(0xFF00212B),
     tertiary = Maths1,
@@ -70,7 +70,7 @@ private val Scheme = darkColorScheme(
     onError = Color(0xFF2A0000)
 )
 
-private val JaagoType = Typography(
+private val AriseType = Typography(
     displayLarge = TextStyle(fontSize = 72.sp, fontWeight = FontWeight.Bold, letterSpacing = (-2).sp),
     headlineLarge = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
     headlineSmall = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
@@ -84,5 +84,5 @@ private val JaagoType = Typography(
 
 @Composable
 fun JaagoTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, typography = JaagoType, content = content)
+    MaterialTheme(colorScheme = Scheme, typography = AriseType, content = content)
 }

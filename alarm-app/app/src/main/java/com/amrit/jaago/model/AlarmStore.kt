@@ -122,6 +122,14 @@ object AlarmStore {
         prefs.edit().remove(OVERRIDE_PREFIX + alarmId).apply()
     }
 
+    // ----- personalisation -----
+
+    var userName: String
+        get() = if (isReady) prefs.getString("user_name", "") ?: "" else ""
+        set(value) {
+            if (isReady) prefs.edit().putString("user_name", value.trim().take(24)).apply()
+        }
+
     // ----- setup gate -----
 
     var setupDismissed: Boolean

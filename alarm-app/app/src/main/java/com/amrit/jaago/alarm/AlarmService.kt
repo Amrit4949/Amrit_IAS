@@ -317,7 +317,7 @@ class AlarmService : Service() {
     }
 
     companion object {
-        private const val TAG = "JaagoService"
+        private const val TAG = "AriseService"
         private const val FIRST_RE_RAISE_MS = 2_500L
         private const val RE_RAISE_INTERVAL_MS = 6_000L
         private const val SCREEN_WAKE_MS = 12_000L

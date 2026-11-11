@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.amrit.jaago.model.AlarmStore
 import com.amrit.jaago.ui.theme.Alarm1
 import com.amrit.jaago.ui.theme.GhostButton
 import com.amrit.jaago.ui.theme.GlassCard
@@ -70,7 +71,7 @@ fun SettingsScreen(onOpenPassages: () -> Unit) {
         PageBackground(glow = if (state.criticalOk) Good else Alarm1)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 30.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 30.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item { ScreenHeader(title = "Settings", subtitle = "Make the alarm unmissable") }
@@ -160,6 +161,32 @@ fun SettingsScreen(onOpenPassages: () -> Unit) {
             }
 
             item {
+                GlassCard {
+                    SectionLabel("Your name")
+                    var name by remember { mutableStateOf(AlarmStore.userName) }
+                    androidx.compose.material3.OutlinedTextField(
+                        value = name,
+                        onValueChange = {
+                            name = it.take(24)
+                            AlarmStore.userName = it
+                        },
+                        label = { Text("For the greeting on the home screen") },
+                        singleLine = true,
+                        colors = androidx.compose.material3.TextFieldDefaults.outlinedTextFieldColors(
+                            focusedBorderColor = Alarm1.copy(alpha = 0.7f),
+                            unfocusedBorderColor = Hairline,
+                            focusedLabelColor = Alarm1,
+                            unfocusedLabelColor = TextLo,
+                            cursorColor = Alarm1,
+                            containerColor = Slate2
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            item {
                 GlassCard(accent = Scan1) {
                     SectionLabel("Typing passages")
                     Text(
@@ -181,7 +208,7 @@ fun SettingsScreen(onOpenPassages: () -> Unit) {
                 GlassCard {
                     SectionLabel("Worth knowing")
                     Text(
-                        "Android does not let any app block the home button. While it rings, Jaago keeps pulling the alarm screen back every few seconds, so leaving it is loud rather than possible.",
+                        "Android does not let any app block the home button. While it rings, Arise keeps pulling the alarm screen back every few seconds, so leaving it is loud rather than possible.",
                         fontSize = 12.5.sp,
                         color = TextLo,
                         lineHeight = 18.sp

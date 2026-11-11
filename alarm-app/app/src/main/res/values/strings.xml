@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Jaago</string>
+    <string name="app_name">Arise</string>
     <string name="channel_ring_name">Ringing alarm</string>
     <string name="channel_ring_desc">The full screen alarm that wakes you up</string>
     <string name="channel_info_name">Alarm status</string>

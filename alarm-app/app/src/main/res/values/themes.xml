@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Jaago" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0B0B10</item>
-        <item name="android:statusBarColor">#0B0B10</item>
-        <item name="android:navigationBarColor">#0B0B10</item>
+        <item name="android:windowBackground">#080A16</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
     <style name="Theme.Jaago.Ring" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#120406</item>
-        <item name="android:statusBarColor">#120406</item>
-        <item name="android:navigationBarColor">#120406</item>
+        <item name="android:windowBackground">#080A16</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowShowWallpaper">false</item>
         <item name="android:windowIsTranslucent">false</item>
     </style>

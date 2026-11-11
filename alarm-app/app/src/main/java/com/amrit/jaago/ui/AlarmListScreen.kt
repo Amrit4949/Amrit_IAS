@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -80,6 +83,7 @@ fun AlarmListScreen(onEdit: (Alarm) -> Unit, onOpenSetup: () -> Unit, onAdd: () 
     val context = LocalContext.current
     val is24 = remember { DateFormat.is24HourFormat(context) }
     val alarms by AlarmStore.alarms.collectAsState()
+    val history by AlarmStore.history.collectAsState()
     val perms = rememberPermState()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
@@ -98,27 +102,16 @@ fun AlarmListScreen(onEdit: (Alarm) -> Unit, onOpenSetup: () -> Unit, onAdd: () 
         PageBackground(glow = Alarm1)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Column(modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)) {
-                    Text(
-                        if (next == null) "No upcoming alarms" else AlarmScheduler.ringsInText(next.second, now),
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextHi,
-                        lineHeight = 32.sp
-                    )
-                    if (next != null) {
-                        val a = next.first
-                        Text(
-                            a.clockFull(is24) + (if (a.label.isBlank()) "" else "  ·  ${a.label}"),
-                            fontSize = 14.sp,
-                            color = TextMid
-                        )
-                    }
-                }
+                HomeHero(
+                    next = next,
+                    is24 = is24,
+                    now = now,
+                    streak = WakeStats.streak(history)
+                )
             }
 
             if (!perms.criticalOk) {
@@ -160,6 +153,147 @@ fun AlarmListScreen(onEdit: (Alarm) -> Unit, onOpenSetup: () -> Unit, onAdd: () 
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * The top of the home screen: greeting, what is coming, a line of advice, and the
+ * quote of the day, all over the wallpaper of the next alarm.
+ */
+@Composable
+private fun HomeHero(next: Pair<Alarm, Long>?, is24: Boolean, now: Long, streak: Int) {
+    val shape = RoundedCornerShape(28.dp)
+    val wallpaper = next?.first?.wallpaper ?: Wallpapers.AUTO
+    val accent = Wallpapers.accentOf(wallpaper)
+    val quote = remember(now / 3_600_000L) { Quotes.ofDay(now) }
+    val dateLine = remember(now / 60_000L) {
+        java.text.SimpleDateFormat("EEEE, d MMMM", java.util.Locale.getDefault()).format(java.util.Date(now))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+    ) {
+        WallpaperView(id = wallpaper, animated = true, dim = 0.18f, modifier = Modifier.matchParentSize())
+        // Darken the lower half so the text sits on something.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)))
+                )
+        )
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        Quotes.greeting(now, AlarmStore.userName),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                    Text(dateLine, fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.65f))
+                }
+                if (streak > 0) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_bell),
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("$streak day streak", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(26.dp))
+
+            if (next == null) {
+                Text(
+                    "No upcoming alarms",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    lineHeight = 34.sp
+                )
+                Text(
+                    "Tap + to set one. Sleep well.",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.75f)
+                )
+            } else {
+                val (alarm, at) = next
+                Text(
+                    AlarmScheduler.ringsInText(at, now),
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    lineHeight = 34.sp
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        alarm.clockMain(is24),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent
+                    )
+                    if (!is24) {
+                        Text(
+                            " " + alarm.clockSuffix(is24),
+                            fontSize = 14.sp,
+                            color = accent,
+                            modifier = Modifier.padding(bottom = 3.dp)
+                        )
+                    }
+                    if (alarm.label.isNotBlank()) {
+                        Text(
+                            "   ${alarm.label}",
+                            fontSize = 14.sp,
+                            color = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.padding(bottom = 3.dp)
+                        )
+                    }
+                }
+                val sleepBy = WakeStats.sleepByMillis(at)
+                if (sleepBy > now && at - now > 4 * 3_600_000L) {
+                    val probe = Alarm(
+                        id = 0,
+                        hour = java.util.Calendar.getInstance().apply { timeInMillis = sleepBy }.get(java.util.Calendar.HOUR_OF_DAY),
+                        minute = java.util.Calendar.getInstance().apply { timeInMillis = sleepBy }.get(java.util.Calendar.MINUTE)
+                    )
+                    Text(
+                        "Sleep by ${probe.clockFull(is24)} for 7 hours",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.14f)))
+            Text(
+                "\u201c${quote.text}\u201d",
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                lineHeight = 18.sp
+            )
+            Text(quote.by, fontSize = 11.5.sp, color = Color.White.copy(alpha = 0.6f))
         }
     }
 }
@@ -218,6 +352,7 @@ private fun AlarmCard(
 ) {
     val on = alarm.enabled
     val main = if (on) TextHi else TextLo
+    val tint = Wallpapers.accentOf(alarm.wallpaper)
     val override = AlarmStore.overrideAt(alarm.id).takeIf { it > now }
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -234,7 +369,7 @@ private fun AlarmCard(
                                 Alarm.letterDayName(day),
                                 fontSize = 13.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                                color = if (active && on) Alarm1 else if (active) TextMid else TextLo.copy(alpha = 0.55f)
+                                color = if (active && on) tint else if (active) TextMid else TextLo.copy(alpha = 0.55f)
                             )
                         }
                     }
@@ -384,6 +519,7 @@ fun AlarmFab(onAlarm: () -> Unit, onQuick: () -> Unit, bottomPadding: Dp) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
                 .padding(end = 18.dp, bottom = bottomPadding),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -23,6 +23,7 @@ import com.amrit.jaago.model.SoundProfile
  */
 class AlarmPlayer(private val context: Context) {
 
+    private val rampHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var track: AudioTrack? = null
     private var renderThread: Thread? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -35,16 +36,23 @@ class AlarmPlayer(private val context: Context) {
      * [volumePercent] sets the alarm stream for the duration of the ring and is
      * restored afterwards; null leaves the phone's volume alone (used by previews).
      */
-    fun start(profile: SoundProfile, volumePercent: Int?, vibrate: Boolean, extraLoud: Boolean) {
+    fun start(
+        profile: SoundProfile,
+        volumePercent: Int?,
+        vibrate: Boolean,
+        extraLoud: Boolean,
+        rampSeconds: Int = 0
+    ) {
         stop()
         running = true
         level = 1f
         if (volumePercent != null) setAlarmVolume(volumePercent)
-        if (profile == SoundProfile.SYSTEM) startRingtone() else startSynth(profile, extraLoud)
+        if (profile == SoundProfile.SYSTEM) startRingtone(rampSeconds) else startSynth(profile, extraLoud, rampSeconds)
         if (vibrate) startVibration()
     }
 
-    fun start(alarm: Alarm) = start(alarm.sound, alarm.volumePercent, alarm.vibrate, alarm.extraLoud)
+    fun start(alarm: Alarm) =
+        start(alarm.sound, alarm.volumePercent, alarm.vibrate, alarm.extraLoud, alarm.rampSeconds)
 
     /**
      * Turns the noise down while a mission is being worked on, so you can think,
@@ -58,6 +66,7 @@ class AlarmPlayer(private val context: Context) {
 
     fun stop() {
         running = false
+        rampHandler.removeCallbacksAndMessages(null)
         renderThread?.let { thread ->
             try {
                 thread.join(400)
@@ -82,7 +91,7 @@ class AlarmPlayer(private val context: Context) {
 
     // --- generated tone -------------------------------------------------------
 
-    private fun startSynth(profile: SoundProfile, extraLoud: Boolean) {
+    private fun startSynth(profile: SoundProfile, extraLoud: Boolean, rampSeconds: Int) {
         val minBuffer = AudioTrack.getMinBufferSize(
             ToneSynth.SAMPLE_RATE,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -117,7 +126,7 @@ class AlarmPlayer(private val context: Context) {
         runCatching { audioTrack.setVolume(level) }
         audioTrack.play()
 
-        val synth = ToneSynth(profile, drive = if (extraLoud) 1.7 else 1.0)
+        val synth = ToneSynth(profile, drive = if (extraLoud) 1.7 else 1.0, rampSeconds = rampSeconds.toDouble())
         val chunk = ShortArray(2048)
         val thread = Thread({
             while (running) {
@@ -141,7 +150,8 @@ class AlarmPlayer(private val context: Context) {
 
     // --- the merciful option --------------------------------------------------
 
-    private fun startRingtone() {
+    /** The system tone cannot be shaped per sample, so a gentle start steps its volume up. */
+    private fun startRingtone(rampSeconds: Int) {
         val uri: Uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_ALARM)
             ?: RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
             ?: Settings.System.DEFAULT_ALARM_ALERT_URI
@@ -156,8 +166,20 @@ class AlarmPlayer(private val context: Context) {
                 setDataSource(context, uri)
                 isLooping = true
                 prepare()
-                setVolume(level, level)
+                setVolume(if (rampSeconds > 0) 0.08f else level, if (rampSeconds > 0) 0.08f else level)
                 start()
+            }
+            if (rampSeconds > 0) {
+                val player = mediaPlayer
+                val steps = 20
+                for (i in 1..steps) {
+                    rampHandler.postDelayed({
+                        if (running && mediaPlayer === player) {
+                            val v = (0.08f + 0.92f * i / steps) * level
+                            runCatching { player?.setVolume(v, v) }
+                        }
+                    }, rampSeconds * 1000L * i / steps)
+                }
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Could not play the system alarm tone", t)
@@ -229,7 +251,7 @@ class AlarmPlayer(private val context: Context) {
     }
 
     companion object {
-        private const val TAG = "JaagoPlayer"
+        private const val TAG = "ArisePlayer"
         private const val DUCK_LEVEL = 0.22f
     }
 }

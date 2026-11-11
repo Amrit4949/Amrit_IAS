@@ -96,7 +96,7 @@ fun WithCameraPermission(content: @Composable () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "Jaago needs the camera to read your barcode.",
+                "Arise needs the camera to read your barcode.",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextHi,
@@ -110,7 +110,7 @@ fun WithCameraPermission(content: @Composable () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                "If you refused before, open Settings, Apps, Jaago, Permissions and turn the camera on.",
+                "If you refused before, open Settings, Apps, Arise, Permissions and turn the camera on.",
                 fontSize = 12.5.sp,
                 color = TextLo,
                 lineHeight = 17.sp,
@@ -313,4 +313,4 @@ fun formatName(format: Int): String = when (format) {
     else -> "Barcode"
 }
 
-private const val TAG = "JaagoScanner"
+private const val TAG = "AriseScanner"

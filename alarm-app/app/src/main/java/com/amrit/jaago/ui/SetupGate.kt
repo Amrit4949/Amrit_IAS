@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -69,15 +71,11 @@ fun PermissionChecklist(state: PermState) {
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionLabel("Needed for the alarm to appear")
-        CheckRow(
-            title = "Show over other apps",
-            detail = "Lets the alarm jump onto your screen by itself, locked or not. This is the big one.",
-            ok = state.overlay,
-            action = "Allow"
-        ) { Perms.openOverlay(context) }
+        // Ordered easiest first. Notifications and full screen are never blocked,
+        // and they alone get the alarm onto a locked screen.
         CheckRow(
             title = "Notifications",
-            detail = "The ringing notification is what Android keeps alive, and it is your way back in.",
+            detail = "Without this Android hides the alarm completely, even on the lock screen.",
             ok = state.notifications,
             action = "Allow"
         ) {
@@ -88,17 +86,26 @@ fun PermissionChecklist(state: PermState) {
             }
         }
         CheckRow(
+            title = "Full screen on the lock screen",
+            detail = "Lets Android itself open the alarm when the phone is locked.",
+            ok = state.fullScreen,
+            action = "Allow"
+        ) { Perms.openFullScreen(context) }
+        CheckRow(
             title = "Exact alarms",
             detail = "Rings on the minute, even in deep sleep.",
             ok = state.exact,
             action = "Allow"
         ) { Perms.openExact(context) }
         CheckRow(
-            title = "Full screen on the lock screen",
-            detail = "Lets Android itself open the alarm when the phone is locked.",
-            ok = state.fullScreen,
+            title = "Show over other apps",
+            detail = "Lets the alarm jump in front of whatever you are using when it rings.",
+            ok = state.overlay,
             action = "Allow"
-        ) { Perms.openFullScreen(context) }
+        ) { Perms.openOverlay(context) }
+        if (!state.overlay && Build.VERSION.SDK_INT >= 33) {
+            RestrictedSettingsHelp()
+        }
 
         Spacer(Modifier.height(2.dp))
         SectionLabel("Strongly recommended")
@@ -114,6 +121,49 @@ fun PermissionChecklist(state: PermState) {
         if (oem != null) {
             OemRow(oem = oem, confirmed = state.oemConfirmed)
         }
+    }
+}
+
+/**
+ * Android 13+ blocks "restricted" permissions for apps installed outside an app
+ * store and shows "App was denied access". The user has to lift that once from
+ * the app's own info screen; no app can do it for them.
+ */
+@Composable
+private fun RestrictedSettingsHelp() {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Maths1.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Phone says \u201cApp was denied access\u201d?",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextHi
+        )
+        Text(
+            "Android blocks this for apps installed outside the Play Store until you allow it once:",
+            fontSize = 12.5.sp,
+            color = TextMid,
+            lineHeight = 17.sp
+        )
+        listOf(
+            "Tap Open App info below.",
+            "Tap \u22EE at the top right.",
+            "Choose Allow restricted settings and confirm with your PIN.",
+            "Come back here and tap Allow on Show over other apps again."
+        ).forEachIndexed { i, step ->
+            Row {
+                Text("${i + 1}.", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Maths1, modifier = Modifier.width(20.dp))
+                Text(step, fontSize = 12.5.sp, color = TextHi, lineHeight = 17.sp)
+            }
+        }
+        SmallPill("Open App info", Maths1) { Perms.openAppDetails(context) }
     }
 }
 
@@ -138,7 +188,7 @@ private fun OemRow(oem: Oem, confirmed: Boolean) {
                     "${oem.label} phones add extra kill switches for apps installed outside their store. " +
                         "Turn on Auto-start" +
                         (if (Perms.hasOemPopupScreen()) ", Show on lock screen and Pop-up windows in the background" else "") +
-                        " for Jaago.",
+                        " for Arise.",
                     fontSize = 12.sp,
                     color = TextLo,
                     lineHeight = 16.sp
@@ -260,13 +310,15 @@ fun SetupGateScreen(onDone: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(Modifier.height(8.dp))
             IconBadge(iconRes = R.drawable.ic_bell, from = Alarm1, to = Alarm2, solid = true, boxSize = 58.dp)
             Text(
-                "Let Jaago reach you",
+                "Let Arise reach you",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextHi

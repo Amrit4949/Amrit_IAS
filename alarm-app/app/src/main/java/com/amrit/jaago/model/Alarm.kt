@@ -106,7 +106,11 @@ data class Alarm(
     val maxSnoozes: Int = 2,
     val challenges: List<ChallengeSpec> = emptyList(),
     val autoSilenceMinutes: Int = 15,
-    val strictTyping: Boolean = false
+    val strictTyping: Boolean = false,
+    /** A scene id from Wallpapers, "auto", or "photo:<file>" for the user's own image. */
+    val wallpaper: String = "auto",
+    /** Seconds over which the sound climbs from quiet to full. 0 means straight in. */
+    val rampSeconds: Int = 0
 ) {
     val snoozeEnabled: Boolean get() = snoozeMinutes > 0 && maxSnoozes > 0
 
@@ -202,6 +206,8 @@ object AlarmJson {
         o.put("maxSnoozes", a.maxSnoozes)
         o.put("autoSilenceMinutes", a.autoSilenceMinutes)
         o.put("strictTyping", a.strictTyping)
+        o.put("wallpaper", a.wallpaper)
+        o.put("rampSeconds", a.rampSeconds)
         val ch = JSONArray()
         a.challenges.forEach { ch.put(challengeToJson(it)) }
         o.put("challenges", ch)
@@ -235,7 +241,9 @@ object AlarmJson {
             maxSnoozes = o.optInt("maxSnoozes", 2),
             challenges = challenges,
             autoSilenceMinutes = o.optInt("autoSilenceMinutes", 15),
-            strictTyping = o.optBoolean("strictTyping", false)
+            strictTyping = o.optBoolean("strictTyping", false),
+            wallpaper = o.optString("wallpaper", "auto").ifBlank { "auto" },
+            rampSeconds = o.optInt("rampSeconds", 0).coerceIn(0, 300)
         )
     }
 

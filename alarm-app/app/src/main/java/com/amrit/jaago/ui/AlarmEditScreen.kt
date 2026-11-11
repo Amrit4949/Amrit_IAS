@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -98,6 +100,8 @@ private sealed interface Sheet {
     data class BarcodeCfg(val index: Int, val spec: ChallengeSpec.Barcode) : Sheet
     object Sound : Sheet
     object Snooze : Sheet
+    object Gentle : Sheet
+    object Wallpaper : Sheet
 }
 
 @Composable
@@ -154,7 +158,7 @@ fun AlarmEditScreen(
             ) {
                 // ---------------- header ----------------
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CloseButton(onClick = onCancel)
@@ -350,11 +354,38 @@ fun AlarmEditScreen(
                         accent = Scan1,
                         onCheckedChange = { onChange(alarm.copy(extraLoud = it)) }
                     )
+                    SettingRow(
+                        title = "Gentle wake-up",
+                        value = rampLabel(alarm.rampSeconds)
+                    ) { sheet = Sheet.Gentle }
                 }
 
                 // ---------------- the rest ----------------
                 SectionLabel("Custom settings", modifier = Modifier.padding(start = 6.dp, top = 4.dp))
                 GlassCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { sheet = Sheet.Wallpaper }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Alarm wallpaper", fontSize = 15.sp, color = TextHi)
+                            Text(Wallpapers.titleOf(alarm.wallpaper), fontSize = 13.sp, color = TextMid)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(width = 54.dp, height = 74.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Hairline, RoundedCornerShape(12.dp))
+                        ) {
+                            WallpaperView(id = alarm.wallpaper, animated = false, modifier = Modifier.fillMaxSize())
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Chevron()
+                    }
                     OutlinedTextField(
                         value = alarm.label,
                         onValueChange = { onChange(alarm.copy(label = it.take(40))) },
@@ -392,7 +423,7 @@ fun AlarmEditScreen(
             }
 
             // ---------------- sticky save ----------------
-            Column(modifier = Modifier.fillMaxWidth().background(Ink)) {
+            Column(modifier = Modifier.fillMaxWidth().background(Ink).navigationBarsPadding()) {
                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Hairline))
                 GradientButton(
                     text = "Save",
@@ -405,8 +436,18 @@ fun AlarmEditScreen(
         }
 
         // ---------------- sheets ----------------
+        WallpaperSheet(
+            visible = sheet == Sheet.Wallpaper,
+            current = alarm.wallpaper,
+            onPick = {
+                onChange(alarm.copy(wallpaper = it))
+                sheet = Sheet.None
+            },
+            onDismiss = { sheet = Sheet.None }
+        )
+
         BottomSheet(
-            visible = sheet != Sheet.None,
+            visible = sheet != Sheet.None && sheet != Sheet.Wallpaper,
             onDismiss = { sheet = Sheet.None },
             title = when (shownSheet) {
                 Sheet.Picker -> "Add a mission"
@@ -415,11 +456,35 @@ fun AlarmEditScreen(
                 is Sheet.BarcodeCfg -> "Barcode"
                 Sheet.Sound -> "Alarm sound"
                 Sheet.Snooze -> "Snooze"
+                Sheet.Gentle -> "Gentle wake-up"
+                Sheet.Wallpaper -> null
                 Sheet.None -> null
             }
         ) {
             when (val s = shownSheet) {
                 Sheet.None -> Unit
+                Sheet.Wallpaper -> Unit
+
+                Sheet.Gentle -> {
+                    val options = listOf(0, 30, 60, 120, 300)
+                    Text(
+                        "Starts almost silent and climbs to full volume over this long. Kinder on a normal day; the missions still stand.",
+                        fontSize = 12.5.sp,
+                        color = TextLo,
+                        lineHeight = 17.sp
+                    )
+                    PillSelector(
+                        options = options.map { rampLabel(it) },
+                        selectedIndex = options.indexOf(alarm.rampSeconds).let { if (it < 0) 0 else it },
+                        accent = Alarm1,
+                        onSelect = { i -> onChange(alarm.copy(rampSeconds = options[i])) }
+                    )
+                    GradientButton(
+                        text = "Done",
+                        onClick = { sheet = Sheet.None },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 Sheet.Picker -> MissionPicker(
                     onMaths = { sheet = Sheet.MathsCfg(null, ChallengeSpec.Maths(MathDifficulty.MEDIUM, 3)) },
@@ -831,6 +896,13 @@ private fun Chevron() {
         drawLine(TextMid, Offset(size.width * 0.3f, 0f), Offset(size.width * 0.75f, size.height / 2f), w, StrokeCap.Round)
         drawLine(TextMid, Offset(size.width * 0.75f, size.height / 2f), Offset(size.width * 0.3f, size.height), w, StrokeCap.Round)
     }
+}
+
+private fun rampLabel(seconds: Int): String = when {
+    seconds <= 0 -> "Off"
+    seconds < 60 -> "$seconds s"
+    seconds % 60 == 0 -> "${seconds / 60} min"
+    else -> "${seconds / 60}m ${seconds % 60}s"
 }
 
 @Composable
