@@ -118,7 +118,7 @@ class AlarmPlayer(private val context: Context) {
                 .build()
         } catch (t: Throwable) {
             Log.e(TAG, "AudioTrack unavailable, falling back to the system ringtone", t)
-            startRingtone()
+            startRingtone(rampSeconds)
             return
         }
 
